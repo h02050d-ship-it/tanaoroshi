@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#00695c">
+<title>棚卸ツール</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2300695c"/><text x="50" y="72" font-size="60" text-anchor="middle" fill="white" font-family="sans-serif">棚</text></svg>'>
+<style>
+:root{
+  --main:#00695c; --main-dk:#004d40; --accent:#ff8f00; --bg:#f2f5f4; --card:#fff;
+  --text:#1c2b28; --sub:#6b7f7b; --line:#dde6e4; --danger:#c62828; --info:#1565c0;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif; }
+body{ padding-bottom:80px; }
+button{ font-family:inherit; }
+
+/* ===== ヘッダー ===== */
+header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
+  padding:10px 12px 8px; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.h-row{ display:flex; align-items:center; gap:8px; }
+.h-title{ font-size:17px; font-weight:700; letter-spacing:1px; display:flex; align-items:center; gap:6px; }
+.h-title .ico{ background:#fff; color:var(--main); border-radius:6px; width:24px; height:24px;
+  display:inline-flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; }
+.h-sp{ flex:1; }
+#h-date{ border:none; border-radius:8px; padding:6px 8px; font-size:14px; font-weight:600; color:var(--main-dk); background:#fff; }
+.h-btn{ background:rgba(255,255,255,.16); border:none; color:#fff; border-radius:8px;
+  padding:7px 10px; font-size:16px; line-height:1; }
+.h-btn:active{ background:rgba(255,255,255,.3); }
+
+/* ===== 集計バー ===== */
+#statbar{ display:flex; gap:6px; margin-top:8px; }
+.stat{ flex:1; background:rgba(255,255,255,.13); border-radius:8px; padding:4px 6px; text-align:center; }
+.stat b{ font-size:16px; display:block; }
+.stat span{ font-size:10px; opacity:.85; }
+#pendBadge{ display:none; background:var(--accent); border-radius:8px; padding:4px 8px; text-align:center; font-size:11px; font-weight:700; }
+
+/* ===== タブ ===== */
+#tabs{ display:flex; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:96px; z-index:40; }
+.tab{ flex:1; border:none; background:none; padding:11px 0; font-size:14px; font-weight:600; color:var(--sub);
+  border-bottom:3px solid transparent; }
+.tab.on{ color:var(--main); border-bottom-color:var(--main); }
+
+/* ===== 入力タブ ===== */
+#searchWrap{ padding:10px 12px 6px; display:flex; gap:8px; }
+#search{ flex:1; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; font-size:16px; background:#fff; }
+#search:focus{ outline:none; border-color:var(--main); }
+#manualBtn{ border:1.5px dashed var(--main); color:var(--main); background:#fff; border-radius:10px;
+  padding:0 12px; font-size:13px; font-weight:600; white-space:nowrap; }
+#items{ padding:4px 10px 10px; }
+.item{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px;
+  margin-bottom:7px; display:flex; align-items:center; gap:10px; }
+.item:active{ background:#e0f2f1; }
+.item .nm{ font-size:15px; font-weight:700; }
+.item .spec{ font-size:12.5px; color:var(--sub); margin-top:2px; }
+.item .cnt{ margin-left:auto; text-align:right; flex-shrink:0; }
+.item .cnt .done{ display:inline-block; background:#e0f2f1; color:var(--main); font-size:12px; font-weight:700;
+  border-radius:8px; padding:3px 8px; }
+.item .cnt .arrow{ color:#b0bec5; font-size:18px; }
+.gradeb{ display:inline-block; font-size:11px; font-weight:700; border-radius:6px; padding:2px 6px; margin-left:6px; vertical-align:1px; }
+.empty{ text-align:center; color:var(--sub); padding:40px 20px; font-size:13.5px; }
+.empty .big{ font-size:34px; margin-bottom:8px; }
+.spin{ width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--main);
+  border-radius:50%; margin:0 auto 10px; animation:sp 1s linear infinite; }
+@keyframes sp{ to{ transform:rotate(360deg); } }
+
+/* ===== 一覧タブ ===== */
+#listTab{ display:none; padding:10px 12px; }
+.grp{ background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:10px; overflow:hidden; }
+.grp-h{ padding:9px 12px; background:#eef5f4; display:flex; align-items:baseline; gap:8px; }
+.grp-h .nm{ font-size:14px; font-weight:700; }
+.grp-h .spec{ font-size:11.5px; color:var(--sub); }
+.grp-h .sum{ margin-left:auto; font-size:13px; font-weight:700; color:var(--main); white-space:nowrap; }
+.row{ display:flex; align-items:center; padding:9px 12px; border-top:1px solid var(--line); font-size:13.5px; gap:8px; }
+.row:active{ background:#f4faf9; }
+.row .qty{ font-weight:700; font-size:15px; }
+.row .meta{ color:var(--sub); font-size:11.5px; margin-left:auto; text-align:right; }
+.row .sync-p{ color:var(--accent); font-weight:700; font-size:11px; }
+
+/* ===== ボトムシート（数量入力）===== */
+.ovl{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; }
+.ovl.show{ display:flex; align-items:flex-end; }
+.sheet{ background:#fff; width:100%; border-radius:18px 18px 0 0; padding:16px 16px 22px; max-height:92vh; overflow-y:auto; }
+.sh-item{ font-size:16px; font-weight:700; }
+.sh-spec{ font-size:13px; color:var(--sub); margin-top:2px; margin-bottom:12px; }
+.frow{ display:flex; gap:10px; margin-bottom:10px; }
+.fcol{ flex:1; }
+.flabel{ font-size:12px; font-weight:600; color:var(--sub); margin-bottom:4px; }
+.finput{ width:100%; border:1.5px solid var(--line); border-radius:10px; padding:10px; font-size:22px;
+  font-weight:700; text-align:center; background:#fff; color:var(--text); }
+.finput:focus{ outline:none; border-color:var(--main); }
+.finput.sm{ font-size:15px; font-weight:500; text-align:left; }
+#sh-maisu{ font-size:12.5px; color:var(--sub); text-align:center; margin:-4px 0 10px; }
+.chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.chip{ border:1px solid var(--line); background:#f6f9f8; border-radius:14px; padding:5px 11px; font-size:12.5px; color:var(--text); }
+.chip:active{ background:#e0f2f1; border-color:var(--main); }
+.sh-btns{ display:flex; gap:10px; margin-top:14px; }
+.btn{ flex:1; border:none; border-radius:12px; padding:14px 0; font-size:16px; font-weight:700; }
+.btn-main{ background:var(--main); color:#fff; }
+.btn-main:active{ background:var(--main-dk); }
+.btn-sub{ background:#eceff1; color:var(--text); }
+.btn-del{ background:#fdecea; color:var(--danger); flex:0 0 84px; }
+.manual-only{ display:none; }
+.sheet.manual .manual-only{ display:block; }
+
+/* ===== 電卓 ===== */
+#calcOvl .sheet{ padding-bottom:26px; }
+#calcDisp{ background:#f4f7f6; border-radius:12px; padding:10px 14px; margin-bottom:12px; text-align:right; }
+#calcExpr{ font-size:15px; color:var(--sub); min-height:20px; word-break:break-all; }
+#calcRes{ font-size:30px; font-weight:800; min-height:38px; }
+#calcGrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.ck{ border:none; border-radius:12px; padding:15px 0; font-size:21px; font-weight:700; background:#eef2f1; color:var(--text); }
+.ck:active{ background:#dbe5e3; }
+.ck.op{ background:#e0f2f1; color:var(--main-dk); }
+.ck.eq{ background:var(--main); color:#fff; }
+.ck.cl{ background:#fdecea; color:var(--danger); }
+
+/* ===== トースト ===== */
+#toast{ position:fixed; left:50%; bottom:88px; transform:translateX(-50%) translateY(20px);
+  background:#263238; color:#fff; padding:10px 18px; border-radius:22px; font-size:13.5px;
+  opacity:0; pointer-events:none; transition:.25s; z-index:300; white-space:nowrap; }
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ===== ログインゲート ===== */
+#gate{ display:none; position:fixed; inset:0; background:var(--bg); z-index:200;
+  align-items:center; justify-content:center; padding:24px; }
+.gate-card{ background:#fff; border-radius:16px; padding:26px 22px; width:100%; max-width:340px;
+  box-shadow:0 8px 30px rgba(0,0,0,.12); }
+.gate-card h1{ font-size:18px; margin:0 0 4px; color:var(--main-dk); }
+.gate-card p{ font-size:12.5px; color:var(--sub); margin:0 0 16px; }
+.gate-card input{ width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px;
+  font-size:16px; margin-bottom:10px; }
+.gate-card input:focus{ outline:none; border-color:var(--main); }
+#gateErr{ color:var(--danger); font-size:12.5px; min-height:18px; margin-bottom:4px; }
+#gateBtn{ width:100%; }
+
+/* 追加した瞬間のフィードバック */
+@keyframes flash{ 0%{background:#c8e6c9;} 100%{background:var(--card);} }
+.item.flash{ animation:flash 1s ease-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-row">
+    <div class="h-title"><span class="ico">棚</span>棚卸ツール</div>
+    <div class="h-sp"></div>
+    <input type="date" id="h-date">
+    <button class="h-btn" id="calcBtn" title="電卓">🖩</button>
+    <button class="h-btn" id="menuBtn" title="メニュー">⋮</button>
+  </div>
+  <div id="statbar">
+    <div class="stat"><b id="st-items">0</b><span>品目</span></div>
+    <div class="stat"><b id="st-taba">0</b><span>束</span></div>
+    <div class="stat"><b id="st-bara">0</b><span>バラ枚</span></div>
+    <div class="stat" id="pendBadge"><b id="st-pend">0</b><span>未送信</span></div>
+  </div>
+</header>
+
+<div id="tabs">
+  <button class="tab on" id="tabInput">📝 入力</button>
+  <button class="tab" id="tabList">📋 一覧 <span id="tabListN"></span></button>
+</div>
+
+<div id="inputTab">
+  <div id="searchWrap">
+    <input id="search" type="search" placeholder="品名・等級・寸法でしぼり込み" autocomplete="off">
+    <button id="manualBtn">＋手入力</button>
+  </div>
+  <div id="items"><div class="empty"><div class="spin"></div>品目候補を読み込み中…</div></div>
+</div>
+
+<div id="listTab">
+  <div id="listBody"><div class="empty">まだ入力がありません</div></div>
+</div>
+
+<!-- 数量入力シート -->
+<div class="ovl" id="shOvl">
+  <div class="sheet" id="shSheet">
+    <div class="sh-item" id="sh-name">品目</div>
+    <div class="sh-spec" id="sh-spec"></div>
+    <div class="manual-only">
+      <div class="frow">
+        <div class="fcol" style="flex:2"><div class="flabel">品名</div><input class="finput sm" id="m-hinmei" placeholder="桧フローリング"></div>
+        <div class="fcol"><div class="flabel">等級</div><input class="finput sm" id="m-grade" placeholder="特上小"></div>
+      </div>
+      <div class="frow">
+        <div class="fcol"><div class="flabel">厚</div><input class="finput sm" id="m-t" inputmode="decimal"></div>
+        <div class="fcol"><div class="flabel">巾</div><input class="finput sm" id="m-w" inputmode="decimal"></div>
+        <div class="fcol"><div class="flabel">長</div><input class="finput sm" id="m-l" inputmode="decimal"></div>
+        <div class="fcol"><div class="flabel">入数</div><input class="finput sm" id="m-iri" inputmode="numeric"></div>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fcol"><div class="flabel">束数</div><input class="finput" id="sh-taba" inputmode="numeric" placeholder="0"></div>
+      <div class="fcol"><div class="flabel">バラ（枚）</div><input class="finput" id="sh-bara" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <div id="sh-maisu"></div>
+    <div class="fcol"><div class="flabel">場所（任意）</div><input class="finput sm" id="sh-basho" placeholder="例: 倉庫A・2列目">
+      <div class="chips" id="bashoChips"></div>
+    </div>
+    <div class="fcol" style="margin-top:10px"><div class="flabel">入力者</div><input class="finput sm" id="sh-who" placeholder="名前"></div>
+    <div class="sh-btns">
+      <button class="btn btn-del" id="sh-del" style="display:none">削除</button>
+      <button class="btn btn-sub" id="sh-cancel">キャンセル</button>
+      <button class="btn btn-main" id="sh-save">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 電卓 -->
+<div class="ovl" id="calcOvl">
+  <div class="sheet">
+    <div id="calcDisp"><div id="calcExpr">&nbsp;</div><div id="calcRes">0</div></div>
+    <div id="calcGrid">
+      <button class="ck cl" data-k="C">C</button><button class="ck op" data-k="(">(</button><button class="ck op" data-k=")">)</button><button class="ck op" data-k="/">÷</button>
+      <button class="ck" data-k="7">7</button><button class="ck" data-k="8">8</button><button class="ck" data-k="9">9</button><button class="ck op" data-k="*">×</button>
+      <button class="ck" data-k="4">4</button><button class="ck" data-k="5">5</button><button class="ck" data-k="6">6</button><button class="ck op" data-k="-">−</button>
+      <button class="ck" data-k="1">1</button><button class="ck" data-k="2">2</button><button class="ck" data-k="3">3</button><button class="ck op" data-k="+">＋</button>
+      <button class="ck" data-k="0">0</button><button class="ck" data-k=".">.</button><button class="ck" data-k="B">⌫</button><button class="ck eq" data-k="=">＝</button>
+    </div>
+    <div class="sh-btns"><button class="btn btn-sub" id="calcClose">閉じる</button></div>
+  </div>
+</div>
+
+<!-- ログイン -->
+<div id="gate">
+  <div class="gate-card">
+    <h1>棚 棚卸ツール</h1>
+    <p>社内ツール共通のメールアドレスとパスワードでログイン（初回のみ）</p>
+    <input id="gateMail" type="email" placeholder="メールアドレス" autocomplete="username">
+    <input id="gatePass" type="password" placeholder="パスワード" autocomplete="current-password">
+    <div id="gateErr"></div>
+    <button class="btn btn-main" id="gateBtn">ログイン</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const GAS_URL="https://script.google.com/macros/s/AKfycbyE2O2zEk1NDYskaxflVtPReblSOyA5CyjfHTNXAYzK6tX1zgEzRypcFFSjtDy2SWa7wg/exec";
+
+/* ===== 資格情報（共通SSO: h02050d-ship-it.github.io の他ツールのログインを引き継ぐ）===== */
+const CRED_KEY="hayazai_tanaoroshi_cred";
+const SSO_KEY="hayazai_sso_cred";
+const SSO_PEERS=["hayazai_board_cred","hayazai_seiso_cred","hayazai_rulebook_cred","hayazai_kaizen_cred","notify_creds_v1","seinodesk_cred","faxdesk_cred","orderdesk_cred","nippou_cred"];
+function ssoFind_(){
+  const keys=[SSO_KEY,CRED_KEY].concat(SSO_PEERS);
+  for(const k of keys){
+    try{ const v=JSON.parse(localStorage.getItem(k)||"null");
+      if(v){ const email=v.email||v.e, pass=v.pass||v.p; if(email&&pass) return {email:String(email),pass:String(pass)}; }
+    }catch(e){}
+  }
+  return null;
+}
+function ssoWrite(email,pass){ try{ localStorage.setItem(SSO_KEY,JSON.stringify({email,pass})); }catch(e){} }
+function ssoClear(){ try{ localStorage.removeItem(SSO_KEY); }catch(e){} }
+function creds(){
+  try{ const v=JSON.parse(localStorage.getItem(CRED_KEY)||"null"); if(v&&v.email&&v.pass) return v; }catch(e){}
+  const s=ssoFind_(); if(s){ try{ localStorage.setItem(CRED_KEY,JSON.stringify(s)); }catch(e){} return s; }
+  return {};
+}
+function saveCreds(email,pass){ localStorage.setItem(CRED_KEY,JSON.stringify({email,pass})); ssoWrite(email,pass); }
+function clearCreds(){ localStorage.removeItem(CRED_KEY); ssoClear(); }
+
+/* ===== ユーティリティ ===== */
+const $=id=>document.getElementById(id);
+function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+let toastTimer=null;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function newId(){ return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
+function specStr(it){ const dims=[it.t,it.w,it.l].filter(x=>x!=="").join("×"); return dims+(it.iri?"　入数"+it.iri:""); }
+function itemKey(it){ return [it.hinmei,it.grade,it.t,it.w,it.l,it.iri].join("|"); }
+function gradeColor(g){ if(/無節/.test(g)) return ["#e8eaf6","#3949ab"]; if(/特上|上小/.test(g)) return ["#fff3e0","#e65100"]; if(/丸節|節/.test(g)) return ["#e0f2f1","#00695c"]; return ["#eceff1","#546e7a"]; }
+
+/* GASは時々HTMLエラーページを返す → JSONでなければ間を空けて最大3回 */
+async function fetchJsonRetry(url,opt){
+  let lastErr=null;
+  for(let i=0;i<3;i++){
+    try{
+      const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),i===0?25000:15000);
+      let r;
+      try{ r=await fetch(url,Object.assign({signal:ctrl.signal},opt||{})); } finally{ clearTimeout(to); }
+      const t=await r.text();
+      if(t && t.trim()[0]==="{") return JSON.parse(t);
+      lastErr=new Error("bad response");
+    }catch(e){ lastErr=e; }
+    if(i<2) await new Promise(rs=>setTimeout(rs,2000+i*2000));
+  }
+  throw lastErr||new Error("fetch failed");
+}
+function apiGet(action,params){
+  const c=creds();
+  const q=new URLSearchParams(Object.assign({action,pass:c.pass||""},params||{}));
+  return fetchJsonRetry(GAS_URL+"?"+q.toString());
+}
+function apiPost(action,body){
+  const c=creds();
+  return fetchJsonRetry(GAS_URL+"?action="+action,{method:"POST",body:JSON.stringify(Object.assign({pass:c.pass||""},body))});
+}
+
+/* ===== 状態 ===== */
+const ITEMS_KEY="tana_items_cache_v1";
+const ROWS_KEY="tana_rows_cache_v1";
+const QUEUE_KEY="tana_queue_v1";
+const WHO_KEY="tana_who";
+const BASHO_KEY="tana_basho_recent";
+let ITEMS=[];            // 品目候補
+let ROWS=[];             // 棚卸行（選択日の分・サーバ＋未送信）
+let QUEUE=[];            // 未送信操作 [{op,data}]
+let editingId=null;      // シートで編集中の行id（null=新規）
+let sheetItem=null;      // シートで対象の品目
+let curDate=todayStr();
+
+function loadLS(k,def){ try{ const v=JSON.parse(localStorage.getItem(k)||"null"); return v==null?def:v; }catch(e){ return def; } }
+function saveLS(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+
+/* ===== 起動 ===== */
+function boot(){
+  $("h-date").value=curDate;
+  QUEUE=loadLS(QUEUE_KEY,[]);
+  const c=creds();
+  if(c.email&&c.pass){
+    $("gate").style.display="none";
+    const ci=loadLS(ITEMS_KEY,null); if(ci){ ITEMS=ci; renderItems(); }
+    const cr=loadLS(ROWS_KEY,null); if(cr){ ROWS=cr.filter(r=>r.date===curDate); renderAll(); }
+    refreshItems(); refreshRows(); flushQueue();
+  } else showGate();
+}
+function showGate(err){ $("gate").style.display="flex"; $("gateErr").textContent=err||""; setTimeout(()=>$("gateMail").focus(),80); }
+$("gateBtn").onclick=async()=>{
+  const email=$("gateMail").value.trim(), pass=$("gatePass").value;
+  if(!email||!pass) return;
+  $("gateBtn").disabled=true; $("gateErr").textContent="確認中…";
+  try{
+    const j=await fetchJsonRetry(GAS_URL+"?action=tanaList&pass="+encodeURIComponent(pass));
+    if(j&&j.ok){ saveCreds(email,pass); $("gate").style.display="none"; boot(); }
+    else { $("gateErr").textContent="メールまたはパスワードが違います"; }
+  }catch(e){ $("gateErr").textContent="通信に失敗しました。電波の良い場所でもう一度"; }
+  $("gateBtn").disabled=false;
+};
+["gateMail","gatePass"].forEach(id=>$(id).addEventListener("keydown",e=>{ if(e.key==="Enter") $("gateBtn").click(); }));
+$("menuBtn").onclick=()=>{
+  if(confirm("ログアウトしますか？（保存済みデータは消えません）")){ clearCreds(); location.reload(); }
+};
+
+/* ===== データ取得 ===== */
+async function refreshItems(){
+  try{
+    const j=await apiGet("tanaItems");
+    if(j&&j.ok){ ITEMS=j.items||[]; saveLS(ITEMS_KEY,ITEMS); renderItems(); }
+    else if(j&&j.error==="unauthorized"){ clearCreds(); showGate("ログインし直してください"); }
+  }catch(e){ if(!ITEMS.length) $("items").innerHTML='<div class="empty"><div class="big">📡</div>品目候補の読み込みに失敗しました<br><button class="chip" style="margin-top:12px" onclick="refreshItems()">再読み込み</button></div>'; }
+}
+async function refreshRows(){
+  try{
+    const j=await apiGet("tanaList",{date:curDate});
+    if(j&&j.ok){
+      const server=j.rows||[];
+      const pendAdds=QUEUE.filter(q=>q.op==="add"&&q.data.date===curDate).map(q=>Object.assign({},q.data,{sync:"pending"}));
+      const delIds=new Set(QUEUE.filter(q=>q.op==="delete").map(q=>q.data.id));
+      const updMap={}; QUEUE.forEach(q=>{ if(q.op==="update") updMap[q.data.id]=q.data; });
+      ROWS=server.filter(r=>!delIds.has(r.id)).map(r=>{
+        if(updMap[r.id]){ const u=updMap[r.id]; return Object.assign({},r,{taba:u.taba,bara:u.bara,basho:u.basho??r.basho,sync:"pending"}); }
+        return Object.assign(r,{sync:"ok"});
+      }).concat(pendAdds.filter(p=>!server.some(s=>s.id===p.id)));
+      saveLS(ROWS_KEY,ROWS);
+      renderAll();
+    } else if(j&&j.error==="unauthorized"){ clearCreds(); showGate("ログインし直してください"); }
+  }catch(e){ /* キャッシュ表示のまま */ }
+}
+
+/* ===== 未送信キュー ===== */
+let flushing=false;
+async function flushQueue(){
+  if(flushing||!QUEUE.length) return;
+  flushing=true;
+  try{
+    while(QUEUE.length){
+      const q=QUEUE[0];
+      const act=q.op==="add"?"tanaAdd":q.op==="update"?"tanaUpdate":"tanaDelete";
+      const j=await apiPost(act,q.data);
+      if(j&&(j.ok||j.dup||j.missing)){ QUEUE.shift(); saveLS(QUEUE_KEY,QUEUE); updateStats(); }
+      else if(j&&j.error==="unauthorized"){ clearCreds(); showGate("ログインし直してください"); break; }
+      else break; // サーバ側エラー→後で再試行
+    }
+  }catch(e){ /* オフライン等→後で再試行 */ }
+  flushing=false;
+  updateStats();
+  if(!QUEUE.length) refreshRows();
+}
+setInterval(flushQueue,25000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ flushQueue(); refreshRows(); } });
+function enqueue(op,data){ QUEUE.push({op,data}); saveLS(QUEUE_KEY,QUEUE); flushQueue(); }
+
+/* ===== 日付変更 ===== */
+$("h-date").addEventListener("change",()=>{
+  curDate=$("h-date").value||todayStr();
+  ROWS=[]; renderAll();
+  $("listBody").innerHTML='<div class="empty"><div class="spin"></div>読み込み中…</div>';
+  refreshRows();
+});
+
+/* ===== タブ ===== */
+$("tabInput").onclick=()=>{ setTab("input"); };
+$("tabList").onclick=()=>{ setTab("list"); };
+function setTab(t){
+  $("tabInput").classList.toggle("on",t==="input");
+  $("tabList").classList.toggle("on",t==="list");
+  $("inputTab").style.display=t==="input"?"":"none";
+  $("listTab").style.display=t==="list"?"block":"none";
+}
+
+/* ===== 品目候補 ===== */
+$("search").addEventListener("input",renderItems);
+function renderItems(){
+  const q=$("search").value.trim().toLowerCase();
+  const counted={}; ROWS.forEach(r=>{ const k=itemKey(r); counted[k]=(counted[k]||0)+(Number(r.taba)||0); });
+  let list=ITEMS;
+  if(q){
+    const terms=q.split(/\s+/);
+    list=ITEMS.filter(it=>{
+      const s=(it.hinmei+" "+it.grade+" "+it.t+" "+it.w+" "+it.l+" "+it.iri).toLowerCase();
+      return terms.every(t=>s.includes(t));
+    });
+  }
+  const shown=list.slice(0,150);
+  if(!shown.length){ $("items").innerHTML='<div class="empty">'+(ITEMS.length?"該当する品目がありません<br>「＋手入力」で追加できます":"品目候補がまだありません")+'</div>'; return; }
+  $("items").innerHTML=shown.map(it=>{
+    const k=itemKey(it); const gc=gradeColor(it.grade);
+    const done=counted[k]?'<span class="done">済 '+counted[k]+'束</span>':'<span class="arrow">›</span>';
+    return '<div class="item" data-k="'+esc(k)+'">'+
+      '<div><div class="nm">'+esc(it.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(it.grade||"－")+'</span></div>'+
+      '<div class="spec">'+esc(specStr(it))+'</div></div>'+
+      '<div class="cnt">'+done+'</div></div>';
+  }).join("")+(list.length>150?'<div class="empty" style="padding:14px">他 '+(list.length-150)+' 件…検索でしぼり込んでください</div>':"");
+  document.querySelectorAll("#items .item").forEach(el=>{
+    el.onclick=()=>{ const it=ITEMS.find(x=>itemKey(x)===el.dataset.k); if(it) openSheet(it,null); };
+  });
+}
+
+/* ===== 数量入力シート ===== */
+$("manualBtn").onclick=()=>openSheet(null,null);
+function openSheet(item,row){
+  sheetItem=item; editingId=row?row.id:null;
+  const manual=!item&&!row;
+  $("shSheet").classList.toggle("manual",manual);
+  if(manual){
+    $("sh-name").textContent="手入力で品目を追加";
+    $("sh-spec").textContent="候補にない品目はここから";
+    ["m-hinmei","m-grade","m-t","m-w","m-l","m-iri"].forEach(id=>$(id).value="");
+  } else {
+    const src=row||item;
+    $("sh-name").textContent=src.hinmei+"　"+(src.grade||"");
+    $("sh-spec").textContent=specStr(src);
+  }
+  $("sh-taba").value=row?(row.taba||""):"";
+  $("sh-bara").value=row?(row.bara||""):"";
+  $("sh-basho").value=row?(row.basho||""):"";
+  $("sh-who").value=localStorage.getItem(WHO_KEY)||"";
+  $("sh-del").style.display=row?"":"none";
+  $("sh-save").textContent=row?"保存":"追加";
+  renderBashoChips();
+  updateMaisu();
+  $("shOvl").classList.add("show");
+  if(!manual) setTimeout(()=>$("sh-taba").focus(),120);
+}
+function closeSheet(){ $("shOvl").classList.remove("show"); sheetItem=null; editingId=null; }
+$("sh-cancel").onclick=closeSheet;
+$("shOvl").addEventListener("click",e=>{ if(e.target===$("shOvl")) closeSheet(); });
+["sh-taba","sh-bara"].forEach(id=>$(id).addEventListener("input",updateMaisu));
+function updateMaisu(){
+  const iri=Number((editingId?(ROWS.find(r=>r.id===editingId)||{}).iri:sheetItem?sheetItem.iri:$("m-iri").value)||0);
+  const taba=Number($("sh-taba").value||0), bara=Number($("sh-bara").value||0);
+  $("sh-maisu").textContent=iri>0?("換算 "+(taba*iri+bara).toLocaleString()+" 枚（入数"+iri+"）"):"";
+}
+function renderBashoChips(){
+  const recent=loadLS(BASHO_KEY,[]);
+  $("bashoChips").innerHTML=recent.map(b=>'<button class="chip" type="button">'+esc(b)+'</button>').join("");
+  document.querySelectorAll("#bashoChips .chip").forEach(el=>{ el.onclick=()=>{ $("sh-basho").value=el.textContent; }; });
+}
+$("sh-save").onclick=()=>{
+  const taba=Number($("sh-taba").value||0), bara=Number($("sh-bara").value||0);
+  if(!(taba>0)&&!(bara>0)){ toast("束数かバラ枚数を入れてください"); return; }
+  const who=$("sh-who").value.trim(); if(who) localStorage.setItem(WHO_KEY,who);
+  const basho=$("sh-basho").value.trim();
+  if(basho){ let rc=loadLS(BASHO_KEY,[]); rc=[basho].concat(rc.filter(x=>x!==basho)).slice(0,6); saveLS(BASHO_KEY,rc); }
+  if(editingId){
+    const row=ROWS.find(r=>r.id===editingId); if(!row){ closeSheet(); return; }
+    row.taba=taba; row.bara=bara; row.basho=basho;
+    const iri=Number(row.iri||0); row.maisu=iri>0?taba*iri+bara:"";
+    // 未送信の追加ならキュー内のデータを直接書き換え、送信済みならupdateを積む
+    const qa=QUEUE.find(q=>q.op==="add"&&q.data.id===editingId);
+    if(qa){ qa.data.taba=taba; qa.data.bara=bara; qa.data.basho=basho; qa.data.who=who||qa.data.who; saveLS(QUEUE_KEY,QUEUE); flushQueue(); }
+    else { row.sync="pending"; enqueue("update",{id:editingId,taba,bara,basho}); }
+    toast("修正しました");
+  } else {
+    let it=sheetItem;
+    if(!it){
+      const hinmei=$("m-hinmei").value.trim();
+      if(!hinmei){ toast("品名を入れてください"); return; }
+      it={hinmei,grade:$("m-grade").value.trim(),t:$("m-t").value.trim(),w:$("m-w").value.trim(),l:$("m-l").value.trim(),iri:$("m-iri").value.trim()};
+    }
+    const iri=Number(it.iri||0);
+    const row={ id:newId(), date:curDate, hinmei:it.hinmei, grade:it.grade, t:it.t, w:it.w, l:it.l, iri:it.iri,
+      taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, ts:"", sync:"pending" };
+    ROWS.push(row);
+    enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who});
+    toast("追加: "+it.hinmei+" "+(taba?taba+"束":"")+(bara?" "+bara+"枚":""));
+  }
+  saveLS(ROWS_KEY,ROWS);
+  closeSheet(); renderAll();
+};
+$("sh-del").onclick=()=>{
+  if(!editingId) return;
+  if(!confirm("この行を削除しますか？")) return;
+  ROWS=ROWS.filter(r=>r.id!==editingId);
+  const qi=QUEUE.findIndex(q=>q.op==="add"&&q.data.id===editingId);
+  if(qi>=0){ QUEUE.splice(qi,1); saveLS(QUEUE_KEY,QUEUE); }
+  else enqueue("delete",{id:editingId});
+  saveLS(ROWS_KEY,ROWS);
+  toast("削除しました");
+  closeSheet(); renderAll();
+};
+
+/* ===== 描画 ===== */
+function renderAll(){ updateStats(); renderItems(); renderList(); }
+function updateStats(){
+  const keys=new Set(ROWS.map(itemKey));
+  $("st-items").textContent=keys.size;
+  $("st-taba").textContent=ROWS.reduce((s,r)=>s+(Number(r.taba)||0),0).toLocaleString();
+  $("st-bara").textContent=ROWS.reduce((s,r)=>s+(Number(r.bara)||0),0).toLocaleString();
+  $("tabListN").textContent=ROWS.length?("("+ROWS.length+")"):"";
+  const np=QUEUE.length;
+  $("pendBadge").style.display=np?"block":"none";
+  $("st-pend").textContent=np;
+}
+function renderList(){
+  if(!ROWS.length){ $("listBody").innerHTML='<div class="empty">まだ入力がありません<br>「入力」タブから品目をタップ</div>'; return; }
+  const groups={};
+  ROWS.forEach(r=>{ const k=itemKey(r); (groups[k]=groups[k]||[]).push(r); });
+  const keys=Object.keys(groups).sort((a,b)=>{
+    const la=Math.max(...groups[a].map(r=>r.ts||"")), lb=Math.max(...groups[b].map(r=>r.ts||""));
+    return groups[b][groups[b].length-1].id>groups[a][groups[a].length-1].id?1:-1;
+  });
+  $("listBody").innerHTML=keys.map(k=>{
+    const rows=groups[k]; const f=rows[0];
+    const taba=rows.reduce((s,r)=>s+(Number(r.taba)||0),0);
+    const bara=rows.reduce((s,r)=>s+(Number(r.bara)||0),0);
+    const gc=gradeColor(f.grade);
+    return '<div class="grp"><div class="grp-h">'+
+      '<span class="nm">'+esc(f.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(f.grade||"－")+'</span></span>'+
+      '<span class="spec">'+esc(specStr(f))+'</span>'+
+      '<span class="sum">'+taba.toLocaleString()+'束'+(bara?"＋"+bara+"枚":"")+'</span></div>'+
+      rows.map(r=>'<div class="row" data-id="'+esc(r.id)+'">'+
+        '<span class="qty">'+(Number(r.taba)||0)+'束'+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
+        (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
+        '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
+      '</div>').join("")+'</div>';
+  }).join("");
+  document.querySelectorAll("#listBody .row").forEach(el=>{
+    el.onclick=()=>{ const r=ROWS.find(x=>x.id===el.dataset.id); if(r) openSheet(null,r); };
+  });
+}
+
+/* ===== 電卓 ===== */
+let calcExpr="";
+$("calcBtn").onclick=()=>{ $("calcOvl").classList.add("show"); calcRender(); };
+$("calcClose").onclick=()=>$("calcOvl").classList.remove("show");
+$("calcOvl").addEventListener("click",e=>{ if(e.target===$("calcOvl")) $("calcOvl").classList.remove("show"); });
+document.querySelectorAll(".ck").forEach(b=>{ b.onclick=()=>calcKey(b.dataset.k); });
+function calcEval(expr){
+  if(!expr||!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
+  try{ const v=Function('"use strict";return('+expr+')')(); return (typeof v==="number"&&isFinite(v))?v:null; }catch(e){ return null; }
+}
+function calcKey(k){
+  if(k==="C") calcExpr="";
+  else if(k==="B") calcExpr=calcExpr.slice(0,-1);
+  else if(k==="="){ const v=calcEval(calcExpr); if(v!=null) calcExpr=String(Math.round(v*1e6)/1e6); }
+  else calcExpr+=k;
+  calcRender();
+}
+function calcRender(){
+  $("calcExpr").innerHTML=esc(calcExpr.replace(/\*/g,"×").replace(/\//g,"÷"))||"&nbsp;";
+  const v=calcEval(calcExpr);
+  $("calcRes").textContent=v!=null?v.toLocaleString(undefined,{maximumFractionDigits:6}):(calcExpr?"…":"0");
+}
+
+boot();
+</script>
+</body>
+</html>
