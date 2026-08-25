@@ -92,6 +92,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .chip:active{ background:#e0f2f1; border-color:var(--main); }
 .chips.big .chip{ padding:11px 16px; font-size:15px; font-weight:600; border-radius:12px; }
 .chip.sel{ background:var(--main); border-color:var(--main); color:#fff; font-weight:700; }
+.chip.add{ border-style:dashed; border-color:var(--main); color:var(--main); background:#fff; }
 .calcmini{ border:1px solid var(--line); background:#f6f9f8; border-radius:8px; padding:2px 9px; font-size:14px; margin-left:6px; vertical-align:-2px; }
 .calcmini:active{ background:#e0f2f1; }
 #autoSpec{ font-size:12.5px; color:var(--sub); margin-top:8px; }
@@ -214,14 +215,13 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
   <div class="sheet" id="shSheet">
     <div class="sh-item" id="sh-title">棚卸を追加</div>
     <div class="sh-spec" id="sh-sub"></div>
-    <div class="fcol"><div class="flabel">場所</div><input class="finput sm" id="sh-basho" placeholder="例: 倉庫A・2列目">
-      <div class="chips" id="bashoChips"></div>
-    </div>
+    <div class="fcol"><div class="flabel">場所</div><div class="chips big" id="bashoChips"></div></div>
     <div id="selWrap">
       <div class="flabel" style="margin-top:12px">種別</div><div class="chips big" id="shuChips"></div>
       <div id="stdPart">
-        <div class="flabel" style="margin-top:12px">等級</div><div class="chips big" id="gradeChips"></div>
-        <div class="flabel" style="margin-top:12px">長さ</div><div class="chips big" id="lenChips"></div>
+        <div id="shiireSec"><div class="flabel" style="margin-top:12px">仕入先</div><div class="chips big" id="shiireChips"></div></div>
+        <div id="gradeSec"><div class="flabel" style="margin-top:12px">等級</div><div class="chips big" id="gradeChips"></div></div>
+        <div id="lenSec"><div class="flabel" style="margin-top:12px">長さ</div><div class="chips big" id="lenChips"></div></div>
         <div id="autoSpec"></div>
       </div>
       <div id="freePart" style="display:none">
@@ -237,12 +237,12 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
       </div>
     </div>
     <div class="frow" style="margin-top:12px">
-      <div class="fcol"><div class="flabel">束数 <button type="button" class="calcmini" data-t="sh-taba">🖩</button></div><input class="finput" id="sh-taba" inputmode="decimal" placeholder="0"></div>
-      <div class="fcol"><div class="flabel">バラ（枚） <button type="button" class="calcmini" data-t="sh-bara">🖩</button></div><input class="finput" id="sh-bara" inputmode="numeric" placeholder="0"></div>
-      <div class="fcol" style="flex:0 0 72px"><div class="flabel">入数</div><input class="finput" id="sh-iri" inputmode="numeric" style="font-size:16px"></div>
+      <div class="fcol"><div class="flabel"><span id="tabaLabelTxt">束数</span> <button type="button" class="calcmini" data-t="sh-taba">🖩</button></div><input class="finput" id="sh-taba" inputmode="decimal" placeholder="0"></div>
+      <div class="fcol" id="baraCol"><div class="flabel">バラ（枚） <button type="button" class="calcmini" data-t="sh-bara">🖩</button></div><input class="finput" id="sh-bara" inputmode="numeric" placeholder="0"></div>
+      <div class="fcol" id="iriCol" style="flex:0 0 72px"><div class="flabel">入数</div><input class="finput" id="sh-iri" inputmode="numeric" style="font-size:16px"></div>
     </div>
     <div id="sh-maisu"></div>
-    <div class="fcol" style="margin-top:4px"><div class="flabel">入力者</div><input class="finput sm" id="sh-who" placeholder="名前"></div>
+    <div class="fcol" style="margin-top:4px"><div class="flabel">入力者</div><div class="chips big" id="whoChips"></div></div>
     <div class="sh-btns">
       <button class="btn btn-del" id="sh-del" style="display:none">削除</button>
       <button class="btn btn-sub" id="sh-cancel">キャンセル</button>
@@ -314,8 +314,8 @@ let toastTimer=null;
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function newId(){ return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
-function specStr(it){ const dims=[it.t,it.w,it.l].filter(x=>x!=="").join("×"); return dims+(it.iri?"　入数"+it.iri:""); }
-function itemKey(it){ return [it.hinmei,it.grade,it.t,it.w,it.l,it.iri].join("|"); }
+function specStr(it){ const dims=[it.t,it.w,it.l].filter(x=>x!==""&&x!=null).join("×"); return dims+(it.iri?"　入数"+it.iri:"")+(it.shiire?"　["+it.shiire+"]":""); }
+function itemKey(it){ return [it.hinmei,it.grade,it.t,it.w,it.l,it.iri,it.shiire||""].join("|"); }
 function gradeColor(g){ if(/無節/.test(g)) return ["#e8eaf6","#3949ab"]; if(/特上|上小/.test(g)) return ["#fff3e0","#e65100"]; if(/丸節|節/.test(g)) return ["#e0f2f1","#00695c"]; return ["#eceff1","#546e7a"]; }
 
 /* GASは時々HTMLエラーページを返す → JSONでなければ間を空けて最大3回 */
@@ -348,7 +348,6 @@ function apiPost(action,body){
 const ROWS_KEY="tana_rows_cache_v1";
 const QUEUE_KEY="tana_queue_v1";
 const WHO_KEY="tana_who";
-const BASHO_KEY="tana_basho_recent";
 let ROWS=[];             // 棚卸行（選択日の分・サーバ＋未送信）
 let QUEUE=[];            // 未送信操作 [{op,data}]
 let editingId=null;      // シートで編集中の行id（null=新規）
@@ -451,31 +450,78 @@ function setTab(t){
 }
 
 /* ===== 追加シート（チップ選択式）===== */
-/* 厚・巾は自動: 原板/仕掛品=18・加工品=15・巾=120固定。入数は長さから自動（2026年4月棚卸表準拠・修正可） */
-const SHU_LIST=["原板","仕掛品","加工品"];
+/* 厚・巾は自動: 原板/仕掛品=18・加工品=15・巾=120固定。入数は長さから自動（1m/3m=10枚入・2m/4m=8枚入）。枝は枠数のみ */
+const SHU_LIST=["原板","仕掛品","加工品","枝"];
 const GRADE_LIST=["丸節","小節","特上小","無節","役物","ナイス"];
 const LEN_LIST=[{label:"1m",v:"1000",iri:"10"},{label:"2m",v:"2000",iri:"8"},{label:"3m",v:"3000",iri:"10"},{label:"4m",v:"4000",iri:"8"}];
-let selShu="",selGrade="",selLen="",freeMode=false;
+const BASHO_LIST=["工場","倉庫"];
+const WHO_LIST=["林大樹","林楓"];
+const SHIIRE_LIST=["カネ信","ひかり","ナイス","滝川"];
+const CUSTOM_KEYS={basho:"tana_custom_basho",shu:"tana_custom_shu",grade:"tana_custom_grade",len:"tana_custom_len",who:"tana_custom_who",shiire:"tana_custom_shiire"};
+let selShu="",selGrade="",selLen="",selBasho="",selShiire="",selWho=localStorage.getItem(WHO_KEY)||"",freeMode=false;
+function customList(k){ return loadLS(CUSTOM_KEYS[k],[]); }
+function addCustom(k,v){ const l=customList(k); if(!l.includes(v)){ l.push(v); saveLS(CUSTOM_KEYS[k],l); } }
+function allLens(){ return LEN_LIST.concat(customList("len")); }
 function autoT(){ return selShu==="加工品"?"15":"18"; }
+function isEda(){ return editingId?(ROWS.find(r=>r.id===editingId)||{}).hinmei==="枝":(!freeMode&&selShu==="枝"); }
+function unitOf(r){ return r.hinmei==="枝"?"枠":"束"; }
+function chipsHtml(list,sel){ return list.map(v=>'<button type="button" class="chip'+(sel===v?" sel":"")+'" data-v="'+esc(v)+'">'+esc(v)+'</button>').join(""); }
+function bindChips(id,fn){ document.querySelectorAll("#"+id+" .chip").forEach(el=>{ el.onclick=()=>fn(el.dataset.v); }); }
+function promptAdd(key,label,after){
+  const v=(prompt(label)||"").trim(); if(!v) return;
+  addCustom(key,v); after(v);
+}
+function applyEda(eda){
+  $("tabaLabelTxt").textContent=eda?"枠数":"束数";
+  $("baraCol").style.display=eda?"none":"";
+  $("iriCol").style.display=eda?"none":"";
+}
 function renderChips(){
-  $("shuChips").innerHTML=SHU_LIST.map(s=>'<button type="button" class="chip'+((!freeMode&&selShu===s)?" sel":"")+'" data-v="'+s+'">'+s+'</button>').join("")+
-    '<button type="button" class="chip'+(freeMode?" sel":"")+'" data-v="__free">その他</button>';
-  $("gradeChips").innerHTML=GRADE_LIST.map(g=>'<button type="button" class="chip'+(selGrade===g?" sel":"")+'" data-v="'+g+'">'+g+'</button>').join("");
-  $("lenChips").innerHTML=LEN_LIST.map(l=>'<button type="button" class="chip'+(selLen===l.v?" sel":"")+'" data-v="'+l.v+'">'+l.label+'</button>').join("");
+  const eda=(!freeMode&&selShu==="枝");
+  const ADD='<button type="button" class="chip add" data-v="__add">＋登録</button>';
+  let bl=BASHO_LIST.concat(customList("basho"));
+  if(selBasho&&!bl.includes(selBasho)) bl=bl.concat([selBasho]);
+  $("bashoChips").innerHTML=chipsHtml(bl,selBasho)+ADD;
+  let wl=WHO_LIST.concat(customList("who"));
+  if(selWho&&!wl.includes(selWho)) wl=wl.concat([selWho]);
+  $("whoChips").innerHTML=chipsHtml(wl,selWho)+ADD;
+  $("shuChips").innerHTML=SHU_LIST.concat(customList("shu")).map(s=>'<button type="button" class="chip'+((!freeMode&&selShu===s)?" sel":"")+'" data-v="'+esc(s)+'">'+esc(s)+'</button>').join("")+
+    '<button type="button" class="chip'+(freeMode?" sel":"")+'" data-v="__free">その他</button>'+ADD;
+  let il=SHIIRE_LIST.concat(customList("shiire"));
+  if(selShiire&&!il.includes(selShiire)) il=il.concat([selShiire]);
+  $("shiireChips").innerHTML=chipsHtml(il,selShiire)+ADD;
+  $("gradeChips").innerHTML=chipsHtml(GRADE_LIST.concat(customList("grade")),selGrade)+ADD;
+  $("lenChips").innerHTML=allLens().map(l=>'<button type="button" class="chip'+(selLen===l.v?" sel":"")+'" data-v="'+esc(l.v)+'">'+esc(l.label)+'</button>').join("")+ADD;
   $("stdPart").style.display=freeMode?"none":"";
   $("freePart").style.display=freeMode?"":"none";
-  $("autoSpec").textContent=(!freeMode&&selShu)?("自動設定: 厚"+autoT()+" × 巾120"+(selLen?"（"+esc(selLen)+"mm）":"")):"";
-  document.querySelectorAll("#shuChips .chip").forEach(el=>{ el.onclick=()=>{
-    if(el.dataset.v==="__free"){ freeMode=true; }
-    else { freeMode=false; selShu=el.dataset.v; }
-    renderChips(); updateMaisu();
-  };});
-  document.querySelectorAll("#gradeChips .chip").forEach(el=>{ el.onclick=()=>{ selGrade=el.dataset.v; renderChips(); };});
-  document.querySelectorAll("#lenChips .chip").forEach(el=>{ el.onclick=()=>{
-    selLen=el.dataset.v;
-    $("sh-iri").value=(LEN_LIST.find(l=>l.v===selLen)||{}).iri||"";
-    renderChips(); updateMaisu();
-  };});
+  $("gradeSec").style.display=eda?"none":"";
+  $("lenSec").style.display=eda?"none":"";
+  $("autoSpec").textContent=freeMode?"":(eda?"枝は枠数だけ入力（等級・寸法なし）":(selShu?("自動設定: 厚"+autoT()+" × 巾120"+(selLen?"（"+selLen+"mm）":"")):""));
+  if(!editingId) applyEda(eda);
+  bindChips("bashoChips",v=>{ if(v==="__add") promptAdd("basho","登録する場所名",nv=>{selBasho=nv;renderChips();}); else {selBasho=v;renderChips();} });
+  bindChips("whoChips",v=>{ if(v==="__add") promptAdd("who","登録する入力者名",nv=>{selWho=nv;renderChips();}); else {selWho=v;renderChips();} });
+  bindChips("shuChips",v=>{
+    if(v==="__add") promptAdd("shu","登録する種別名",nv=>{freeMode=false;selShu=nv;renderChips();updateMaisu();});
+    else if(v==="__free"){ freeMode=true; renderChips(); updateMaisu(); }
+    else { freeMode=false; selShu=v; renderChips(); updateMaisu(); }
+  });
+  bindChips("shiireChips",v=>{ if(v==="__add") promptAdd("shiire","登録する仕入先名",nv=>{selShiire=nv;renderChips();}); else {selShiire=(selShiire===v?"":v);renderChips();} });
+  bindChips("gradeChips",v=>{ if(v==="__add") promptAdd("grade","登録する等級名",nv=>{selGrade=nv;renderChips();}); else {selGrade=v;renderChips();} });
+  bindChips("lenChips",v=>{
+    if(v==="__add"){
+      const raw=(prompt("登録する長さをmmで入力（例: 1800）")||"").trim();
+      if(!raw) return;
+      if(!/^\d+$/.test(raw)){ toast("数字（mm）で入れてください"); return; }
+      const l=customList("len");
+      if(!l.some(x=>x.v===raw)){ l.push({label:(Number(raw)%1000===0?(Number(raw)/1000)+"m":raw+"mm"),v:raw,iri:""}); saveLS(CUSTOM_KEYS.len,l); }
+      selLen=raw; $("sh-iri").value="";
+      renderChips(); updateMaisu();
+    } else {
+      selLen=v;
+      $("sh-iri").value=(allLens().find(l=>l.v===v)||{}).iri||"";
+      renderChips(); updateMaisu();
+    }
+  });
 }
 $("bigAdd").onclick=()=>openSheet(null,null);
 function openSheet(_item,row){
@@ -484,21 +530,20 @@ function openSheet(_item,row){
     $("sh-title").textContent=(row.hinmei||"")+"　"+(row.grade||"");
     $("sh-sub").textContent=specStr(row);
     $("selWrap").style.display="none";
+    selBasho=row.basho||"";
   } else {
     $("sh-title").textContent="棚卸を追加";
-    $("sh-sub").textContent="場所→種別→等級→長さ→束数の順にタップ";
+    $("sh-sub").textContent="場所→種別→仕入先→等級→長さ→束数の順にタップ";
     $("selWrap").style.display="";
-    renderChips(); // 直前の選択を保持（同じ棚の連続入力が速い）
   }
+  renderChips(); // 直前の選択を保持（同じ棚の連続入力が速い）。編集時は場所・入力者チップのみ見える
+  if(row) applyEda(row.hinmei==="枝");
   $("sh-taba").value=row?(row.taba||""):"";
   $("sh-bara").value=row?(row.bara||""):"";
   if(row){ $("sh-iri").value=row.iri||""; $("sh-iri").disabled=true; }
-  else { $("sh-iri").disabled=false; if(selLen&&!$("sh-iri").value) $("sh-iri").value=(LEN_LIST.find(l=>l.v===selLen)||{}).iri||""; }
-  $("sh-basho").value=row?(row.basho||""):(loadLS(BASHO_KEY,[])[0]||"");
-  $("sh-who").value=localStorage.getItem(WHO_KEY)||"";
+  else { $("sh-iri").disabled=false; if(selLen&&!$("sh-iri").value) $("sh-iri").value=(allLens().find(l=>l.v===selLen)||{}).iri||""; }
   $("sh-del").style.display=row?"":"none";
   $("sh-save").textContent=row?"保存":"追加";
-  renderBashoChips();
   updateMaisu();
   $("shOvl").classList.add("show");
 }
@@ -507,23 +552,19 @@ $("sh-cancel").onclick=closeSheet;
 $("shOvl").addEventListener("click",e=>{ if(e.target===$("shOvl")) closeSheet(); });
 ["sh-taba","sh-bara","sh-iri"].forEach(id=>$(id).addEventListener("input",updateMaisu));
 function updateMaisu(){
+  if(isEda()){ $("sh-maisu").textContent=""; return; }
   const iri=Number((editingId?(ROWS.find(r=>r.id===editingId)||{}).iri:$("sh-iri").value)||0);
   const taba=Number($("sh-taba").value||0), bara=Number($("sh-bara").value||0);
   $("sh-maisu").textContent=iri>0?("換算 "+(taba*iri+bara).toLocaleString()+" 枚（入数"+iri+"）"):"";
 }
-function renderBashoChips(){
-  const recent=loadLS(BASHO_KEY,[]);
-  $("bashoChips").innerHTML=recent.map(b=>'<button class="chip" type="button">'+esc(b)+'</button>').join("");
-  document.querySelectorAll("#bashoChips .chip").forEach(el=>{ el.onclick=()=>{ $("sh-basho").value=el.textContent; }; });
-}
 $("sh-save").onclick=()=>{
-  const taba=Number($("sh-taba").value||0), bara=Number($("sh-bara").value||0);
-  if(!(taba>0)&&!(bara>0)){ toast("束数かバラ枚数を入れてください"); return; }
-  const who=$("sh-who").value.trim();
-  if(!who){ toast("入力者の名前を入れてください（2人照合に使います）"); $("sh-who").focus(); return; }
+  const eda=isEda();
+  const taba=Number($("sh-taba").value||0), bara=eda?0:Number($("sh-bara").value||0);
+  if(!(taba>0)&&!(bara>0)){ toast(eda?"枠数を入れてください":"束数かバラ枚数を入れてください"); return; }
+  const who=selWho;
+  if(!who){ toast("入力者を選んでください（2人照合に使います）"); return; }
   localStorage.setItem(WHO_KEY,who);
-  const basho=$("sh-basho").value.trim();
-  if(basho){ let rc=loadLS(BASHO_KEY,[]); rc=[basho].concat(rc.filter(x=>x!==basho)).slice(0,6); saveLS(BASHO_KEY,rc); }
+  const basho=selBasho;
   if(editingId){
     const row=ROWS.find(r=>r.id===editingId); if(!row){ closeSheet(); return; }
     row.taba=taba; row.bara=bara; row.basho=basho;
@@ -538,19 +579,21 @@ $("sh-save").onclick=()=>{
     if(freeMode){
       const hinmei=$("m-hinmei").value.trim();
       if(!hinmei){ toast("品名を入れてください"); return; }
-      it={hinmei,grade:$("m-grade").value.trim(),t:$("m-t").value.trim(),w:$("m-w").value.trim(),l:$("m-l").value.trim(),iri:$("sh-iri").value.trim()};
+      it={hinmei,grade:$("m-grade").value.trim(),t:$("m-t").value.trim(),w:$("m-w").value.trim(),l:$("m-l").value.trim(),iri:$("sh-iri").value.trim(),shiire:""};
+    } else if(selShu==="枝"){
+      it={hinmei:"枝",grade:"",t:"",w:"",l:"",iri:"1",shiire:selShiire};
     } else {
       if(!selShu){ toast("種別を選んでください"); return; }
       if(!selGrade){ toast("等級を選んでください"); return; }
       if(!selLen){ toast("長さを選んでください"); return; }
-      it={hinmei:selShu,grade:selGrade,t:autoT(),w:"120",l:selLen,iri:$("sh-iri").value.trim()};
+      it={hinmei:selShu,grade:selGrade,t:autoT(),w:"120",l:selLen,iri:$("sh-iri").value.trim(),shiire:selShiire};
     }
     const iri=Number(it.iri||0);
     const row={ id:newId(), date:curDate, hinmei:it.hinmei, grade:it.grade, t:it.t, w:it.w, l:it.l, iri:it.iri,
-      taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, ts:"", sync:"pending" };
+      taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, shiire:it.shiire||"", ts:"", sync:"pending" };
     ROWS.push(row);
-    enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who});
-    toast("追加: "+it.hinmei+" "+(taba?taba+"束":"")+(bara?" "+bara+"枚":""));
+    enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who,shiire:row.shiire});
+    toast("追加: "+it.hinmei+" "+(taba?taba+unitOf(it):"")+(bara?" "+bara+"枚":""));
   }
   saveLS(ROWS_KEY,ROWS);
   closeSheet(); renderAll();
@@ -580,7 +623,7 @@ function renderRecent(){
     return '<div class="item" data-id="'+esc(r.id)+'">'+
       '<div><div class="nm">'+esc(r.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(r.grade||"－")+'</span></div>'+
       '<div class="spec">'+esc(specStr(r))+(r.basho?"　📍"+esc(r.basho):"")+'</div></div>'+
-      '<div class="cnt"><span class="done">'+(Number(r.taba)||0)+'束'+(Number(r.bara)?"＋"+r.bara+"枚":"")+'</span>'+
+      '<div class="cnt"><span class="done">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?"＋"+r.bara+"枚":"")+'</span>'+
       (r.sync==="pending"?'<div class="sync-p">●未送信</div>':'')+'</div></div>';
   }).join("");
   document.querySelectorAll("#recentWrap .item").forEach(el=>{
@@ -613,9 +656,9 @@ function renderList(){
     return '<div class="grp"><div class="grp-h">'+
       '<span class="nm">'+esc(f.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(f.grade||"－")+'</span></span>'+
       '<span class="spec">'+esc(specStr(f))+'</span>'+
-      '<span class="sum">'+taba.toLocaleString()+'束'+(bara?"＋"+bara+"枚":"")+'</span></div>'+
+      '<span class="sum">'+taba.toLocaleString()+unitOf(f)+(bara?"＋"+bara+"枚":"")+'</span></div>'+
       rows.map(r=>'<div class="row" data-id="'+esc(r.id)+'">'+
-        '<span class="qty">'+(Number(r.taba)||0)+'束'+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
+        '<span class="qty">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
         (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
         '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
       '</div>').join("")+'</div>';
@@ -627,8 +670,10 @@ function renderList(){
 
 /* ===== 照合（2人ダブルチェック）===== */
 function whoName_(r){ return String(r.who||"").trim()||"（名前なし）"; }
-function qtyStr_(taba,bara,iri){
-  return (taba?taba.toLocaleString()+"束":"")+(bara?(taba?"＋":"")+bara.toLocaleString()+"枚":"")+(!taba&&!bara?"0":"")+
+function qtyStr_(taba,bara,iri,unit){
+  unit=unit||"束";
+  if(unit==="枠") iri=0;
+  return (taba?taba.toLocaleString()+unit:"")+(bara?(taba?"＋":"")+bara.toLocaleString()+"枚":"")+(!taba&&!bara?"0":"")+
     (iri>0?"（換算"+(taba*iri+bara).toLocaleString()+"枚）":"");
 }
 function renderCheck(){
@@ -677,20 +722,22 @@ function renderCheck(){
       :c.st==="one"?'<span class="cbadge one">⚠️ '+esc(c.names[0])+'のみ</span>'
       :'<span class="cbadge ok">✅ 一致</span>';
     const base=c.per[c.names[0]];
+    const cunit=unitOf(c.f);
     const whoLines=c.names.map((w,i)=>{
       const p=c.per[w];
       let diff="";
       if(c.st==="ng"&&i>0){
-        const d=c.iri>0?(p.taba*c.iri+p.bara)-(base.taba*c.iri+base.bara):p.taba-base.taba;
-        const unit=c.iri>0?"枚":"束";
+        const useIri=c.iri>0&&cunit!=="枠";
+        const d=useIri?(p.taba*c.iri+p.bara)-(base.taba*c.iri+base.bara):p.taba-base.taba;
+        const unit=useIri?"枚":cunit;
         if(d!==0) diff='<span class="d">'+(d>0?"＋":"−")+Math.abs(d).toLocaleString()+unit+'</span>';
-        else if(c.iri<=0&&p.bara!==base.bara) diff='<span class="d">'+(p.bara>base.bara?"＋":"−")+Math.abs(p.bara-base.bara)+'枚</span>';
+        else if(!useIri&&p.bara!==base.bara) diff='<span class="d">'+(p.bara>base.bara?"＋":"−")+Math.abs(p.bara-base.bara)+'枚</span>';
       }
-      return '<div class="cwho"><span class="w">'+esc(w)+'</span><span>'+qtyStr_(p.taba,p.bara,c.iri)+'</span>'+diff+'</div>';
+      return '<div class="cwho"><span class="w">'+esc(w)+'</span><span>'+qtyStr_(p.taba,p.bara,c.iri,cunit)+'</span>'+diff+'</div>';
     }).join("");
     const detail=(c.st!=="ok")?c.names.map(w=>c.per[w].rows.map(r=>
       '<div class="row" data-id="'+esc(r.id)+'">'+
-        '<span class="qty">'+(Number(r.taba)||0)+'束'+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
+        '<span class="qty">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
         (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
         '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
       '</div>').join("")).join(""):"";
