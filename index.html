@@ -105,6 +105,33 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .manual-only{ display:none; }
 .sheet.manual .manual-only{ display:block; }
 
+/* ===== 照合タブ ===== */
+#checkTab{ display:none; padding:10px 12px; }
+.crefresh{ width:100%; border:1.5px dashed var(--main); color:var(--main); background:#fff; border-radius:10px; padding:10px 0; font-size:13px; font-weight:600; margin-bottom:10px; }
+.crefresh:active{ background:#e0f2f1; }
+#checkSummary{ display:flex; gap:6px; margin-bottom:10px; }
+.csum{ flex:1; border-radius:10px; padding:8px 6px; text-align:center; font-size:11px; font-weight:600; }
+.csum b{ display:block; font-size:18px; }
+.csum.ng{ background:#fdecea; color:var(--danger); }
+.csum.one{ background:#fff3e0; color:#e65100; }
+.csum.ok{ background:#e0f2f1; color:var(--main); }
+.cgrp{ background:var(--card); border:1px solid var(--line); border-left-width:4px; border-radius:12px; margin-bottom:10px; overflow:hidden; }
+.cgrp.ng{ border-left-color:var(--danger); }
+.cgrp.one{ border-left-color:var(--accent); }
+.cgrp.ok{ border-left-color:var(--main); }
+.cgrp-h{ padding:9px 12px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.cgrp-h .nm{ font-size:14px; font-weight:700; }
+.cgrp-h .spec{ font-size:11.5px; color:var(--sub); }
+.cbadge{ margin-left:auto; font-size:11px; font-weight:700; border-radius:8px; padding:3px 8px; white-space:nowrap; }
+.cbadge.ng{ background:#fdecea; color:var(--danger); }
+.cbadge.one{ background:#fff3e0; color:#e65100; }
+.cbadge.ok{ background:#e0f2f1; color:var(--main); }
+.cwho{ display:flex; align-items:center; gap:8px; padding:7px 12px; border-top:1px solid var(--line); font-size:13.5px; }
+.cwho .w{ font-weight:700; }
+.cwho .d{ margin-left:auto; font-weight:700; color:var(--danger); font-size:12.5px; white-space:nowrap; }
+#tabCheckN{ color:#ffab91; }
+.tab.on #tabCheckN{ color:var(--danger); }
+
 /* ===== 電卓 ===== */
 #calcOvl .sheet{ padding-bottom:26px; }
 #calcDisp{ background:#f4f7f6; border-radius:12px; padding:10px 14px; margin-bottom:12px; text-align:right; }
@@ -162,6 +189,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 <div id="tabs">
   <button class="tab on" id="tabInput">📝 入力</button>
   <button class="tab" id="tabList">📋 一覧 <span id="tabListN"></span></button>
+  <button class="tab" id="tabCheck">👥 照合 <span id="tabCheckN"></span></button>
 </div>
 
 <div id="inputTab">
@@ -174,6 +202,12 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 
 <div id="listTab">
   <div id="listBody"><div class="empty">まだ入力がありません</div></div>
+</div>
+
+<div id="checkTab">
+  <button class="crefresh" id="checkRefresh">🔄 相手の入力を取り込んで再判定</button>
+  <div id="checkSummary"></div>
+  <div id="checkBody"><div class="empty">まだ入力がありません</div></div>
 </div>
 
 <!-- 数量入力シート -->
@@ -408,11 +442,15 @@ $("h-date").addEventListener("change",()=>{
 /* ===== タブ ===== */
 $("tabInput").onclick=()=>{ setTab("input"); };
 $("tabList").onclick=()=>{ setTab("list"); };
+$("tabCheck").onclick=()=>{ setTab("check"); refreshRows(); };
+$("checkRefresh").onclick=()=>{ toast("最新を取り込んでいます…"); refreshRows(); };
 function setTab(t){
   $("tabInput").classList.toggle("on",t==="input");
   $("tabList").classList.toggle("on",t==="list");
+  $("tabCheck").classList.toggle("on",t==="check");
   $("inputTab").style.display=t==="input"?"":"none";
   $("listTab").style.display=t==="list"?"block":"none";
+  $("checkTab").style.display=t==="check"?"block":"none";
 }
 
 /* ===== 品目候補 ===== */
@@ -486,7 +524,9 @@ function renderBashoChips(){
 $("sh-save").onclick=()=>{
   const taba=Number($("sh-taba").value||0), bara=Number($("sh-bara").value||0);
   if(!(taba>0)&&!(bara>0)){ toast("束数かバラ枚数を入れてください"); return; }
-  const who=$("sh-who").value.trim(); if(who) localStorage.setItem(WHO_KEY,who);
+  const who=$("sh-who").value.trim();
+  if(!who){ toast("入力者の名前を入れてください（2人照合に使います）"); $("sh-who").focus(); return; }
+  localStorage.setItem(WHO_KEY,who);
   const basho=$("sh-basho").value.trim();
   if(basho){ let rc=loadLS(BASHO_KEY,[]); rc=[basho].concat(rc.filter(x=>x!==basho)).slice(0,6); saveLS(BASHO_KEY,rc); }
   if(editingId){
@@ -528,7 +568,7 @@ $("sh-del").onclick=()=>{
 };
 
 /* ===== 描画 ===== */
-function renderAll(){ updateStats(); renderItems(); renderList(); }
+function renderAll(){ updateStats(); renderItems(); renderList(); renderCheck(); }
 function updateStats(){
   const keys=new Set(ROWS.map(itemKey));
   $("st-items").textContent=keys.size;
@@ -563,6 +603,85 @@ function renderList(){
       '</div>').join("")+'</div>';
   }).join("");
   document.querySelectorAll("#listBody .row").forEach(el=>{
+    el.onclick=()=>{ const r=ROWS.find(x=>x.id===el.dataset.id); if(r) openSheet(null,r); };
+  });
+}
+
+/* ===== 照合（2人ダブルチェック）===== */
+function whoName_(r){ return String(r.who||"").trim()||"（名前なし）"; }
+function qtyStr_(taba,bara,iri){
+  return (taba?taba.toLocaleString()+"束":"")+(bara?(taba?"＋":"")+bara.toLocaleString()+"枚":"")+(!taba&&!bara?"0":"")+
+    (iri>0?"（換算"+(taba*iri+bara).toLocaleString()+"枚）":"");
+}
+function renderCheck(){
+  const whos=[...new Set(ROWS.map(whoName_))];
+  if(!ROWS.length||whos.length<2){
+    $("checkSummary").innerHTML="";
+    $("tabCheckN").textContent="";
+    $("checkBody").innerHTML='<div class="empty"><div class="big">👥</div><b>2人で入力すると自動で突き合わせます</b><br><br><span style="font-size:12.5px;line-height:1.8">同じ棚を2人が別々のスマホで数えて入力（入力者名は各自の名前）。<br>このタブで品目ごとに一致・不一致を自動判定します。'+(ROWS.length?"<br><br>いまは入力者が「"+esc(whos[0]||"")+"」の1人だけです":"")+'</span></div>';
+    return;
+  }
+  const groups={};
+  ROWS.forEach(r=>{ const k=itemKey(r); (groups[k]=groups[k]||[]).push(r); });
+  const cards=[];
+  Object.keys(groups).forEach(k=>{
+    const rows=groups[k], f=rows[0], iri=Number(f.iri||0);
+    const per={};
+    rows.forEach(r=>{
+      const w=whoName_(r);
+      per[w]=per[w]||{taba:0,bara:0,rows:[]};
+      per[w].taba+=Number(r.taba)||0; per[w].bara+=Number(r.bara)||0; per[w].rows.push(r);
+    });
+    const names=Object.keys(per);
+    let st;
+    if(names.length<2) st="one";
+    else {
+      const eq=iri>0
+        ? names.every(w=>per[w].taba*iri+per[w].bara===per[names[0]].taba*iri+per[names[0]].bara)
+        : names.every(w=>per[w].taba===per[names[0]].taba&&per[w].bara===per[names[0]].bara);
+      st=eq?"ok":"ng";
+    }
+    cards.push({k,f,iri,per,names,st});
+  });
+  const nNg=cards.filter(c=>c.st==="ng").length,
+        nOne=cards.filter(c=>c.st==="one").length,
+        nOk=cards.filter(c=>c.st==="ok").length;
+  $("tabCheckN").textContent=(nNg+nOne)?"("+(nNg+nOne)+")":"";
+  $("checkSummary").innerHTML=
+    '<div class="csum ng"><b>'+nNg+'</b>不一致</div>'+
+    '<div class="csum one"><b>'+nOne+'</b>片方のみ</div>'+
+    '<div class="csum ok"><b>'+nOk+'</b>一致</div>';
+  const order={ng:0,one:1,ok:2};
+  cards.sort((a,b)=>order[a.st]-order[b.st]);
+  $("checkBody").innerHTML=cards.map(c=>{
+    const gc=gradeColor(c.f.grade);
+    const badge=c.st==="ng"?'<span class="cbadge ng">❌ 不一致</span>'
+      :c.st==="one"?'<span class="cbadge one">⚠️ '+esc(c.names[0])+'のみ</span>'
+      :'<span class="cbadge ok">✅ 一致</span>';
+    const base=c.per[c.names[0]];
+    const whoLines=c.names.map((w,i)=>{
+      const p=c.per[w];
+      let diff="";
+      if(c.st==="ng"&&i>0){
+        const d=c.iri>0?(p.taba*c.iri+p.bara)-(base.taba*c.iri+base.bara):p.taba-base.taba;
+        const unit=c.iri>0?"枚":"束";
+        if(d!==0) diff='<span class="d">'+(d>0?"＋":"−")+Math.abs(d).toLocaleString()+unit+'</span>';
+        else if(c.iri<=0&&p.bara!==base.bara) diff='<span class="d">'+(p.bara>base.bara?"＋":"−")+Math.abs(p.bara-base.bara)+'枚</span>';
+      }
+      return '<div class="cwho"><span class="w">'+esc(w)+'</span><span>'+qtyStr_(p.taba,p.bara,c.iri)+'</span>'+diff+'</div>';
+    }).join("");
+    const detail=(c.st!=="ok")?c.names.map(w=>c.per[w].rows.map(r=>
+      '<div class="row" data-id="'+esc(r.id)+'">'+
+        '<span class="qty">'+(Number(r.taba)||0)+'束'+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
+        (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
+        '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
+      '</div>').join("")).join(""):"";
+    return '<div class="cgrp '+c.st+'"><div class="cgrp-h">'+
+      '<span class="nm">'+esc(c.f.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(c.f.grade||"－")+'</span></span>'+
+      '<span class="spec">'+esc(specStr(c.f))+'</span>'+badge+'</div>'+
+      whoLines+detail+'</div>';
+  }).join("");
+  document.querySelectorAll("#checkBody .row").forEach(el=>{
     el.onclick=()=>{ const r=ROWS.find(x=>x.id===el.dataset.id); if(r) openSheet(null,r); };
   });
 }
