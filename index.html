@@ -29,6 +29,8 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .h-btn{ background:rgba(255,255,255,.16); border:none; color:#fff; border-radius:8px;
   padding:7px 10px; font-size:16px; line-height:1; }
 .h-btn:active{ background:rgba(255,255,255,.3); }
+#calcBtn{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; padding:6px 9px; }
+#calcBtn svg{ width:15px; height:15px; }
 
 /* ===== 集計バー ===== */
 #statbar{ display:flex; gap:6px; margin-top:8px; }
@@ -93,8 +95,13 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .chips.big .chip{ padding:11px 16px; font-size:15px; font-weight:600; border-radius:12px; }
 .chip.sel{ background:var(--main); border-color:var(--main); color:#fff; font-weight:700; }
 .chip.add{ border-style:dashed; border-color:var(--main); color:var(--main); background:#fff; }
-.calcmini{ border:1px solid var(--line); background:#f6f9f8; border-radius:8px; padding:2px 9px; font-size:14px; margin-left:6px; vertical-align:-2px; }
-.calcmini:active{ background:#e0f2f1; }
+.calcmini{ display:inline-flex; align-items:center; gap:4px; border:1px solid var(--main); background:#e8f4f2;
+  color:var(--main-dk); border-radius:8px; padding:4px 10px; font-size:12.5px; font-weight:700; margin-left:6px; vertical-align:-4px; }
+.calcmini:active{ background:var(--main); color:#fff; }
+.calcmini svg{ width:14px; height:14px; flex-shrink:0; }
+.ico-calc{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.ico-calc .scr{ fill:currentColor; stroke:none; }
+.ico-calc .dot{ fill:currentColor; stroke:none; }
 #autoSpec{ font-size:12.5px; color:var(--sub); margin-top:8px; }
 #bigAdd{ width:100%; padding:18px 0; font-size:18px; border-radius:14px; }
 .sh-btns{ display:flex; gap:10px; margin-top:14px; }
@@ -176,7 +183,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
     <div class="h-title"><span class="ico">棚</span>棚卸ツール</div>
     <div class="h-sp"></div>
     <input type="date" id="h-date">
-    <button class="h-btn" id="calcBtn" title="電卓">🖩</button>
+    <button class="h-btn" id="calcBtn" title="電卓"><svg class="ico-calc" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="1.4" width="11.6" height="13.2" rx="2"/><rect class="scr" x="4.2" y="3.4" width="7.6" height="2.6" rx="0.7"/><circle class="dot" cx="5.2" cy="8.6" r="0.95"/><circle class="dot" cx="8" cy="8.6" r="0.95"/><circle class="dot" cx="10.8" cy="8.6" r="0.95"/><circle class="dot" cx="5.2" cy="11.8" r="0.95"/><circle class="dot" cx="8" cy="11.8" r="0.95"/><circle class="dot" cx="10.8" cy="11.8" r="0.95"/></svg>電卓</button>
     <button class="h-btn" id="menuBtn" title="メニュー">⋮</button>
   </div>
   <div id="statbar">
@@ -237,8 +244,8 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
       </div>
     </div>
     <div class="frow" style="margin-top:12px">
-      <div class="fcol"><div class="flabel"><span id="tabaLabelTxt">束数</span> <button type="button" class="calcmini" data-t="sh-taba">🖩</button></div><input class="finput" id="sh-taba" inputmode="decimal" placeholder="0"></div>
-      <div class="fcol" id="baraCol"><div class="flabel">バラ（枚） <button type="button" class="calcmini" data-t="sh-bara">🖩</button></div><input class="finput" id="sh-bara" inputmode="numeric" placeholder="0"></div>
+      <div class="fcol"><div class="flabel"><span id="tabaLabelTxt">束数</span> <button type="button" class="calcmini" data-t="sh-taba"><svg class="ico-calc" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="1.4" width="11.6" height="13.2" rx="2"/><rect class="scr" x="4.2" y="3.4" width="7.6" height="2.6" rx="0.7"/><circle class="dot" cx="5.2" cy="8.6" r="0.95"/><circle class="dot" cx="8" cy="8.6" r="0.95"/><circle class="dot" cx="10.8" cy="8.6" r="0.95"/><circle class="dot" cx="5.2" cy="11.8" r="0.95"/><circle class="dot" cx="8" cy="11.8" r="0.95"/><circle class="dot" cx="10.8" cy="11.8" r="0.95"/></svg>電卓</button></div><input class="finput" id="sh-taba" inputmode="decimal" placeholder="0"></div>
+      <div class="fcol" id="baraCol"><div class="flabel">バラ（枚） <button type="button" class="calcmini" data-t="sh-bara"><svg class="ico-calc" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="1.4" width="11.6" height="13.2" rx="2"/><rect class="scr" x="4.2" y="3.4" width="7.6" height="2.6" rx="0.7"/><circle class="dot" cx="5.2" cy="8.6" r="0.95"/><circle class="dot" cx="8" cy="8.6" r="0.95"/><circle class="dot" cx="10.8" cy="8.6" r="0.95"/><circle class="dot" cx="5.2" cy="11.8" r="0.95"/><circle class="dot" cx="8" cy="11.8" r="0.95"/><circle class="dot" cx="10.8" cy="11.8" r="0.95"/></svg>電卓</button></div><input class="finput" id="sh-bara" inputmode="numeric" placeholder="0"></div>
       <div class="fcol" id="iriCol" style="flex:0 0 72px"><div class="flabel">入数</div><input class="finput" id="sh-iri" inputmode="numeric" style="font-size:16px"></div>
     </div>
     <div id="sh-maisu"></div>
