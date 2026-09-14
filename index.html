@@ -577,6 +577,7 @@ $("sh-save").onclick=()=>{
   if(!who){ toast("入力者を選んでください（2人照合に使います）"); return; }
   localStorage.setItem(WHO_KEY,who);
   const basho=selBasho;
+  if(!basho){ toast("場所を選んでください（必須）"); return; }
   if(editingId){
     const row=ROWS.find(r=>r.id===editingId); if(!row){ closeSheet(); return; }
     row.taba=taba; row.bara=bara; row.basho=basho;
@@ -601,11 +602,21 @@ $("sh-save").onclick=()=>{
       it={hinmei:selShu,grade:selGrade,t:autoT(),w:"120",l:selLen,iri:$("sh-iri").value.trim(),shiire:selShiire};
     }
     const iri=Number(it.iri||0);
+    // 入数が空/0だと枚数に換算されない（枝は枠数なので対象外）
+    if(!eda&&!(iri>0)&&!confirm("入数が未入力です（枚数に換算されません）。このまま保存しますか？")) return;
+    // 相方（別の入力者）が同じ品目を違う束数で入れていれば知らせる（保存は止めない）
+    let mate=null;
+    try{
+      const k=itemKey(it), per={};
+      ROWS.filter(r=>itemKey(r)===k&&whoName_(r)!==who).forEach(r=>{ const w=whoName_(r); per[w]=(per[w]||0)+(Number(r.taba)||0); });
+      const w=Object.keys(per).find(w=>per[w]!==taba); if(w) mate={who:w,taba:per[w]};
+    }catch(_){ mate=null; }
     const row={ id:newId(), date:curDate, hinmei:it.hinmei, grade:it.grade, t:it.t, w:it.w, l:it.l, iri:it.iri,
       taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, shiire:it.shiire||"", ts:"", sync:"pending" };
     ROWS.push(row);
     enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who,shiire:row.shiire});
     toast("追加: "+it.hinmei+" "+(taba?taba+unitOf(it):"")+(bara?" "+bara+"枚":""));
+    if(mate) setTimeout(()=>toast(mate.who+"さんは同じ品目を "+mate.taba+unitOf(it)+"で入れています（今回 "+taba+unitOf(it)+"）"),2300);
   }
   saveLS(ROWS_KEY,ROWS);
   closeSheet(); renderAll();
