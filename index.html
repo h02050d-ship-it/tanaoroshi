@@ -565,8 +565,11 @@ function openSheet(_item,row){
     $("sh-title").textContent="棚卸を追加";
     $("sh-sub").textContent="場所→種別→仕入先→等級→長さ→束数の順にタップ";
     $("selWrap").style.display="";
+    // 引き継ぐのは場所だけ（入力者は端末が覚えている本人の名前）。種別・仕入先・等級・長さ・入数は毎回選び直す
+    selShu=""; selShiire=""; selGrade=""; selLen=""; freeMode=false;
+    ["sh-iri","m-hinmei","m-grade","m-t","m-w","m-l"].forEach(id=>{ $(id).value=""; });
   }
-  renderChips(); // 直前の選択を保持（同じ棚の連続入力が速い）。編集時は場所・入力者チップのみ見える
+  renderChips(); // 編集時は場所・入力者チップのみ見える
   if(row) applyEda(row.hinmei==="枝");
   $("sh-taba").value=row?(row.taba||""):"";
   $("sh-bara").value=row?(row.bara||""):"";
@@ -599,6 +602,7 @@ $("sh-save").onclick=()=>{
   const basho=selBasho;
   if(!basho){ toast("場所を選んでください（必須）"); return; }
   const memo=$("sh-memo").value.trim();
+  let toTop=false;
   if(editingId){
     const row=ROWS.find(r=>r.id===editingId); if(!row){ closeSheet(); return; }
     row.taba=taba; row.bara=bara; row.basho=basho; row.memo=memo;
@@ -639,9 +643,12 @@ $("sh-save").onclick=()=>{
     if(viewWho!==VIEW_ALL) viewWho=who; // 一覧・上部合計は「いま入力している人の分」に合わせる
     toast("追加: "+it.hinmei+" "+(taba?taba+unitOf(it):"")+(bara?" "+bara+"枚":""));
     if(mate) setTimeout(()=>toast(mate.who+"さんは同じ品目を "+mate.taba+unitOf(it)+"で入れています（今回 "+taba+unitOf(it)+"）"),2300);
+    toTop=true;
   }
   saveLS(ROWS_KEY,ROWS);
   closeSheet(); renderAll();
+  // 追加後は一番上（＋棚卸を追加ボタン）へ戻す。キーボードが閉じた後にもう一度（スマホは閉じる時に位置がずれる）
+  if(toTop){ try{ document.activeElement&&document.activeElement.blur(); }catch(_){} window.scrollTo(0,0); setTimeout(()=>window.scrollTo(0,0),350); }
 };
 $("sh-del").onclick=()=>{
   if(!editingId) return;
