@@ -42,6 +42,19 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .stat b{ font-size:16px; display:block; }
 .stat span{ font-size:10px; opacity:.85; }
 #pendBadge{ display:none; background:var(--accent); border-radius:8px; padding:4px 8px; text-align:center; font-size:11px; font-weight:700; }
+/* 入力者が2人以上の日だけ出る「誰の分の合計か」。タップで切替 */
+#st-who{ display:none; flex:0 0 auto; max-width:104px; background:#fff; color:var(--main-dk); cursor:pointer; }
+#st-who b{ font-size:13px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#st-who span{ opacity:1; font-weight:700; }
+#memoBox{ margin:0 0 10px; }
+#memoBox summary{ font-size:12.5px; font-weight:600; color:var(--main); padding:6px 2px; cursor:pointer; }
+#memoBox textarea{ margin-top:4px; resize:vertical; font-family:inherit; }
+.row{ flex-wrap:wrap; }
+.rmemo{ flex:0 0 100%; font-size:12px; color:var(--sub); white-space:pre-wrap; word-break:break-all; }
+.viewbar{ margin:0 0 10px; }
+.viewbar .chips{ margin-top:0; }
+.viewnote{ font-size:12px; color:var(--sub); margin-top:6px; line-height:1.6; }
+.viewnote.warn{ color:#e65100; font-weight:600; }
 
 /* ===== タブ ===== */
 #tabs{ display:flex; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:96px; z-index:40; }
@@ -194,6 +207,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
     <button class="h-btn" id="menuBtn" title="メニュー">⋮</button>
   </div>
   <div id="statbar">
+    <div class="stat" id="st-who" title="タップで切替"><b id="st-who-n"></b><span id="st-who-l">の分 ⇄</span></div>
     <div class="stat"><b id="st-items">0</b><span>品目</span></div>
     <div class="stat"><b id="st-taba">0</b><span>束</span></div>
     <div class="stat"><b id="st-bara">0</b><span>バラ枚</span></div>
@@ -256,6 +270,8 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
       <div class="fcol" id="iriCol" style="flex:0 0 72px"><div class="flabel">入数</div><input class="finput" id="sh-iri" inputmode="numeric" style="font-size:16px"></div>
     </div>
     <div id="sh-maisu"></div>
+    <details id="memoBox"><summary>📝 メモ（任意・タップで開く）</summary>
+      <textarea class="finput sm" id="sh-memo" rows="2" placeholder="例: 端に傷あり・濡れ・数え直し要"></textarea></details>
     <div class="fcol" style="margin-top:4px"><div class="flabel">入力者</div><div class="chips big" id="whoChips"></div></div>
     <div class="sh-btns">
       <button class="btn btn-del" id="sh-del" style="display:none">削除</button>
@@ -409,7 +425,7 @@ async function refreshRows(){
       const delIds=new Set(QUEUE.filter(q=>q.op==="delete").map(q=>q.data.id));
       const updMap={}; QUEUE.forEach(q=>{ if(q.op==="update") updMap[q.data.id]=q.data; });
       ROWS=server.filter(r=>!delIds.has(r.id)).map(r=>{
-        if(updMap[r.id]){ const u=updMap[r.id]; return Object.assign({},r,{taba:u.taba,bara:u.bara,basho:u.basho??r.basho,sync:"pending"}); }
+        if(updMap[r.id]){ const u=updMap[r.id]; return Object.assign({},r,{taba:u.taba,bara:u.bara,basho:u.basho??r.basho,memo:u.memo??r.memo,sync:"pending"}); }
         return Object.assign(r,{sync:"ok"});
       }).concat(pendAdds.filter(p=>!server.some(s=>s.id===p.id)));
       saveLS(ROWS_KEY,ROWS);
@@ -556,6 +572,8 @@ function openSheet(_item,row){
   $("sh-bara").value=row?(row.bara||""):"";
   if(row){ $("sh-iri").value=row.iri||""; $("sh-iri").disabled=true; }
   else { $("sh-iri").disabled=false; if(selLen&&!$("sh-iri").value) $("sh-iri").value=(allLens().find(l=>l.v===selLen)||{}).iri||""; }
+  $("sh-memo").value=row?(row.memo||""):"";
+  $("memoBox").open=!!(row&&row.memo); // 普段は閉じておく。メモがある行の修正時だけ開く
   $("sh-del").style.display=row?"":"none";
   $("sh-save").textContent=row?"保存":"追加";
   updateMaisu();
@@ -580,14 +598,15 @@ $("sh-save").onclick=()=>{
   localStorage.setItem(WHO_KEY,who);
   const basho=selBasho;
   if(!basho){ toast("場所を選んでください（必須）"); return; }
+  const memo=$("sh-memo").value.trim();
   if(editingId){
     const row=ROWS.find(r=>r.id===editingId); if(!row){ closeSheet(); return; }
-    row.taba=taba; row.bara=bara; row.basho=basho;
+    row.taba=taba; row.bara=bara; row.basho=basho; row.memo=memo;
     const iri=Number(row.iri||0); row.maisu=iri>0?taba*iri+bara:"";
     // 未送信の追加ならキュー内のデータを直接書き換え、送信済みならupdateを積む
     const qa=QUEUE.find(q=>q.op==="add"&&q.data.id===editingId);
-    if(qa){ qa.data.taba=taba; qa.data.bara=bara; qa.data.basho=basho; qa.data.who=who||qa.data.who; saveLS(QUEUE_KEY,QUEUE); flushQueue(); }
-    else { row.sync="pending"; enqueue("update",{id:editingId,taba,bara,basho}); }
+    if(qa){ qa.data.taba=taba; qa.data.bara=bara; qa.data.basho=basho; qa.data.memo=memo; qa.data.who=who||qa.data.who; saveLS(QUEUE_KEY,QUEUE); flushQueue(); }
+    else { row.sync="pending"; enqueue("update",{id:editingId,taba,bara,basho,memo}); }
     toast("修正しました");
   } else {
     let it;
@@ -614,9 +633,10 @@ $("sh-save").onclick=()=>{
       const w=Object.keys(per).find(w=>per[w]!==taba); if(w) mate={who:w,taba:per[w]};
     }catch(_){ mate=null; }
     const row={ id:newId(), date:curDate, hinmei:it.hinmei, grade:it.grade, t:it.t, w:it.w, l:it.l, iri:it.iri,
-      taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, shiire:it.shiire||"", ts:"", sync:"pending" };
+      taba, bara, maisu:iri>0?taba*iri+bara:"", basho, who, shiire:it.shiire||"", memo, ts:"", sync:"pending" };
     ROWS.push(row);
-    enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who,shiire:row.shiire});
+    enqueue("add",{id:row.id,date:row.date,hinmei:row.hinmei,grade:row.grade,t:row.t,w:row.w,l:row.l,iri:row.iri,taba,bara,basho,who,shiire:row.shiire,memo});
+    if(viewWho!==VIEW_ALL) viewWho=who; // 一覧・上部合計は「いま入力している人の分」に合わせる
     toast("追加: "+it.hinmei+" "+(taba?taba+unitOf(it):"")+(bara?" "+bara+"枚":""));
     if(mate) setTimeout(()=>toast(mate.who+"さんは同じ品目を "+mate.taba+unitOf(it)+"で入れています（今回 "+taba+unitOf(it)+"）"),2300);
   }
@@ -637,17 +657,36 @@ $("sh-del").onclick=()=>{
 
 /* ===== 描画 ===== */
 function renderAll(){ updateStats(); renderRecent(); renderList(); renderCheck(); }
+/* 入力者が2人以上いる日は、一覧・上部合計を「1人分」で出す（同じ棚を2人で数えると合算は2倍になるため）。
+   全員合算は分担して数えたとき用に、明示的に選んだときだけ */
+const VIEW_ALL="__all";
+let viewWho="";
+function whoList_(){ return [...new Set(ROWS.map(whoName_))]; }
+function viewRows_(){
+  const whos=whoList_();
+  if(whos.length<2||viewWho===VIEW_ALL) return ROWS;
+  if(!whos.includes(viewWho)) viewWho=whos.includes(selWho)?selWho:whos[0];
+  return ROWS.filter(r=>whoName_(r)===viewWho);
+}
+function viewLabel_(){ return viewWho===VIEW_ALL?"全員合算":viewWho+"の分"; }
+$("st-who").onclick=()=>{
+  const opts=whoList_().concat([VIEW_ALL]);
+  viewWho=opts[(opts.indexOf(viewWho)+1)%opts.length];
+  renderAll();
+  toast("表示: "+viewLabel_());
+};
 function renderRecent(){
+  const V=viewRows_(), multi=whoList_().length>1;
   if(!ROWS.length){
     $("recentWrap").innerHTML='<div class="empty"><div class="big">📦</div>「＋ 棚卸を追加」から入力を始めてください<br><span style="font-size:12px">場所→種別→等級→長さをタップ→束数を入れるだけ<br>厚・巾は自動（原板/仕掛品=18・加工品=15・巾120）</span></div>';
     return;
   }
-  const recent=ROWS.slice().reverse().slice(0,8);
-  $("recentWrap").innerHTML='<div class="flabel" style="margin:8px 2px 6px">直近の入力（タップで修正）</div>'+recent.map(r=>{
+  const recent=V.slice().reverse().slice(0,8);
+  $("recentWrap").innerHTML='<div class="flabel" style="margin:8px 2px 6px">直近の入力（タップで修正）'+(multi?"・"+esc(viewLabel_()):"")+'</div>'+recent.map(r=>{
     const gc=gradeColor(r.grade);
     return '<div class="item" data-id="'+esc(r.id)+'">'+
       '<div><div class="nm">'+esc(r.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(r.grade||"－")+'</span></div>'+
-      '<div class="spec">'+esc(specStr(r))+(r.basho?"　📍"+esc(r.basho):"")+'</div></div>'+
+      '<div class="spec">'+esc(specStr(r))+(r.basho?"　📍"+esc(r.basho):"")+'</div>'+(r.memo?'<div class="spec">📝 '+esc(r.memo)+'</div>':'')+'</div>'+
       '<div class="cnt"><span class="done">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?"＋"+r.bara+"枚":"")+'</span>'+
       (r.sync==="pending"?'<div class="sync-p">●未送信</div>':'')+'</div></div>';
   }).join("");
@@ -656,24 +695,37 @@ function renderRecent(){
   });
 }
 function updateStats(){
-  const keys=new Set(ROWS.map(itemKey));
+  const V=viewRows_(), multi=whoList_().length>1;
+  $("st-who").style.display=multi?"block":"none";
+  if(multi){
+    $("st-who-n").textContent=viewWho===VIEW_ALL?"全員":viewWho;
+    $("st-who-l").textContent=(viewWho===VIEW_ALL?"合算":"の分")+" ⇄";
+  }
+  const keys=new Set(V.map(itemKey));
   $("st-items").textContent=keys.size;
-  $("st-taba").textContent=ROWS.reduce((s,r)=>s+(Number(r.taba)||0),0).toLocaleString();
-  $("st-bara").textContent=ROWS.reduce((s,r)=>s+(Number(r.bara)||0),0).toLocaleString();
-  $("tabListN").textContent=ROWS.length?("("+ROWS.length+")"):"";
+  $("st-taba").textContent=V.reduce((s,r)=>s+(Number(r.taba)||0),0).toLocaleString();
+  $("st-bara").textContent=V.reduce((s,r)=>s+(Number(r.bara)||0),0).toLocaleString();
+  $("tabListN").textContent=V.length?("("+V.length+")"):"";
   const np=QUEUE.length;
   $("pendBadge").style.display=np?"block":"none";
   $("st-pend").textContent=np;
 }
 function renderList(){
   if(!ROWS.length){ $("listBody").innerHTML='<div class="empty">まだ入力がありません<br>「入力」タブから品目をタップ</div>'; return; }
+  const V=viewRows_(), whos=whoList_();
+  const viewBar=whos.length<2?"":'<div class="viewbar"><div class="chips" id="viewChips">'+
+    whos.map(w=>'<button type="button" class="chip'+(viewWho===w?" sel":"")+'" data-v="'+esc(w)+'">'+esc(w)+'の分</button>').join("")+
+    '<button type="button" class="chip'+(viewWho===VIEW_ALL?" sel":"")+'" data-v="'+VIEW_ALL+'">全員合算</button></div>'+
+    (viewWho===VIEW_ALL
+      ?'<div class="viewnote warn">⚠️ 全員の入力を足した数です。同じ棚を2人で数えた分は2倍になります（分担して数えたとき用）</div>'
+      :'<div class="viewnote">'+esc(viewWho)+'さんが入力した分だけの合計です。突き合わせは「照合」タブ</div>')+'</div>';
   const groups={};
-  ROWS.forEach(r=>{ const k=itemKey(r); (groups[k]=groups[k]||[]).push(r); });
+  V.forEach(r=>{ const k=itemKey(r); (groups[k]=groups[k]||[]).push(r); });
   const keys=Object.keys(groups).sort((a,b)=>{
     const la=Math.max(...groups[a].map(r=>r.ts||"")), lb=Math.max(...groups[b].map(r=>r.ts||""));
     return groups[b][groups[b].length-1].id>groups[a][groups[a].length-1].id?1:-1;
   });
-  $("listBody").innerHTML=keys.map(k=>{
+  $("listBody").innerHTML=viewBar+keys.map(k=>{
     const rows=groups[k]; const f=rows[0];
     const taba=rows.reduce((s,r)=>s+(Number(r.taba)||0),0);
     const bara=rows.reduce((s,r)=>s+(Number(r.bara)||0),0);
@@ -686,8 +738,10 @@ function renderList(){
         '<span class="qty">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
         (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
         '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
+        (r.memo?'<span class="rmemo">📝 '+esc(r.memo)+'</span>':'')+
       '</div>').join("")+'</div>';
   }).join("");
+  bindChips("viewChips",v=>{ viewWho=v; renderAll(); });
   document.querySelectorAll("#listBody .row").forEach(el=>{
     el.onclick=()=>{ const r=ROWS.find(x=>x.id===el.dataset.id); if(r) openSheet(null,r); };
   });
@@ -765,6 +819,7 @@ function renderCheck(){
         '<span class="qty">'+(Number(r.taba)||0)+unitOf(r)+(Number(r.bara)?'＋'+r.bara+'枚':'')+'</span>'+
         (r.basho?'<span style="color:var(--sub);font-size:12px">📍'+esc(r.basho)+'</span>':'')+
         '<span class="meta">'+(r.sync==="pending"?'<span class="sync-p">●未送信</span> ':'')+esc(r.who||"")+' '+esc((r.ts||"").slice(11,16))+'</span>'+
+        (r.memo?'<span class="rmemo">📝 '+esc(r.memo)+'</span>':'')+
       '</div>').join("")).join(""):"";
     return '<div class="cgrp '+c.st+'"><div class="cgrp-h">'+
       '<span class="nm">'+esc(c.f.hinmei)+'<span class="gradeb" style="background:'+gc[0]+';color:'+gc[1]+'">'+esc(c.f.grade||"－")+'</span></span>'+
