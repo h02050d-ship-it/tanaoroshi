@@ -579,6 +579,7 @@ function openSheet(_item,row){
   $("memoBox").open=!!(row&&row.memo); // 普段は閉じておく。メモがある行の修正時だけ開く
   $("sh-del").style.display=row?"":"none";
   $("sh-save").textContent=row?"保存":"追加";
+  $("sh-save").setAttribute("aria-label",row?"修正を保存":"追加を登録"); // 計測(tu.js)が「追加」を確定として数えるため（2026-10-05）
   updateMaisu();
   $("shOvl").classList.add("show");
 }
