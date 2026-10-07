@@ -35,6 +35,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
 .h-btn:active{ background:rgba(255,255,255,.3); }
 #calcBtn{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; padding:6px 9px; }
 #calcBtn svg{ width:15px; height:15px; }
+.dimlab{ font-size:12px; color:#6d615a; margin:0 4px 0 2px; align-self:center; }
 
 /* ===== 集計バー ===== */
 #statbar{ display:flex; gap:6px; margin-top:8px; }
@@ -250,6 +251,7 @@ header{ position:sticky; top:0; z-index:50; background:var(--main); color:#fff;
         <div id="shiireSec"><div class="flabel" style="margin-top:12px">仕入先</div><div class="chips big" id="shiireChips"></div></div>
         <div id="gradeSec"><div class="flabel" style="margin-top:12px">等級</div><div class="chips big" id="gradeChips"></div></div>
         <div id="lenSec"><div class="flabel" style="margin-top:12px">長さ</div><div class="chips big" id="lenChips"></div></div>
+        <div id="dimSec"><div class="flabel" style="margin-top:12px">寸法（役物・ひかり材は実寸を選ぶ）</div><div class="chips" id="dimChips"></div></div>
         <div id="autoSpec"></div>
       </div>
       <div id="freePart" style="display:none">
@@ -487,6 +489,9 @@ const LEN_LIST=[{label:"1m",v:"1000",iri:"10"},{label:"2m",v:"2000",iri:"8"},{la
 const BASHO_LIST=["工場","倉庫"];
 const WHO_LIST=["林大樹","林楓"];
 const SHIIRE_LIST=["カネ信","ひかり","ナイス","滝川"];
+/* 厚・巾の選択肢（2026-10-07）: 既定は自動値(原板/仕掛品=18・加工品=15・巾120)。ひかりの役物は巾130・厚15があるため選べるようにした。空=自動 */
+const T_LIST=["15","18"],W_LIST=["120","130"];
+let selT="",selW="";
 const CUSTOM_KEYS={basho:"tana_custom_basho",shu:"tana_custom_shu",grade:"tana_custom_grade",len:"tana_custom_len",who:"tana_custom_who",shiire:"tana_custom_shiire"};
 let selShu="",selGrade="",selLen="",selBasho="",selShiire="",selWho=localStorage.getItem(WHO_KEY)||"",freeMode=false;
 function customList(k){ return loadLS(CUSTOM_KEYS[k],[]); }
@@ -526,7 +531,12 @@ function renderChips(){
   $("freePart").style.display=freeMode?"":"none";
   $("gradeSec").style.display=eda?"none":"";
   $("lenSec").style.display=eda?"none":"";
-  $("autoSpec").textContent=freeMode?"":(eda?"枝は枠数だけ入力（等級・寸法なし）":(selShu?("自動設定: 厚"+autoT()+" × 巾120"+(selLen?"（"+selLen+"mm）":"")):""));
+  const tNow=selT||autoT(), wNow=selW||"120";
+  $("dimChips").innerHTML='<span class="dimlab">厚</span>'+T_LIST.map(v=>'<button type="button" class="chip'+(tNow===v?" sel":"")+'" data-k="t" data-v="'+v+'">'+v+'</button>').join("")+
+    '<span class="dimlab">巾</span>'+W_LIST.map(v=>'<button type="button" class="chip'+(wNow===v?" sel":"")+'" data-k="w" data-v="'+v+'">'+v+'</button>').join("");
+  $("dimSec").style.display=eda?"none":"";
+  $("autoSpec").textContent=freeMode?"":(eda?"枝は枠数だけ入力（等級・寸法なし）":(selShu?("寸法: 厚"+tNow+" × 巾"+wNow+(selLen?"（"+selLen+"mm）":"")+((selT||selW)?"　手動で選択":"　自動。役物・ひかり材は実寸を選ぶ")):""));
+  document.querySelectorAll("#dimChips .chip").forEach(el=>{ el.onclick=()=>{ if(el.dataset.k==="t") selT=el.dataset.v; else selW=el.dataset.v; renderChips(); }; });
   if(!editingId) applyEda(eda);
   bindChips("bashoChips",v=>{ if(v==="__add") promptAdd("basho","登録する場所名",nv=>{selBasho=nv;renderChips();}); else {selBasho=v;renderChips();} });
   bindChips("whoChips",v=>{ if(v==="__add") promptAdd("who","登録する入力者名",nv=>{selWho=nv;renderChips();}); else {selWho=v;renderChips();} });
@@ -566,7 +576,7 @@ function openSheet(_item,row){
     $("sh-sub").textContent="場所→種別→仕入先→等級→長さ→束数の順にタップ";
     $("selWrap").style.display="";
     // 引き継ぐのは場所だけ（入力者は端末が覚えている本人の名前）。種別・仕入先・等級・長さ・入数は毎回選び直す
-    selShu=""; selShiire=""; selGrade=""; selLen=""; freeMode=false;
+    selShu=""; selShiire=""; selGrade=""; selLen=""; selT=""; selW=""; freeMode=false;
     ["sh-iri","m-hinmei","m-grade","m-t","m-w","m-l"].forEach(id=>{ $(id).value=""; });
   }
   renderChips(); // 編集時は場所・入力者チップのみ見える
@@ -625,7 +635,7 @@ $("sh-save").onclick=()=>{
       if(!selShu){ toast("種別を選んでください"); return; }
       if(!selGrade){ toast("等級を選んでください"); return; }
       if(!selLen){ toast("長さを選んでください"); return; }
-      it={hinmei:selShu,grade:selGrade,t:autoT(),w:"120",l:selLen,iri:$("sh-iri").value.trim(),shiire:selShiire};
+      it={hinmei:selShu,grade:selGrade,t:selT||autoT(),w:selW||"120",l:selLen,iri:$("sh-iri").value.trim(),shiire:selShiire};
     }
     const iri=Number(it.iri||0);
     // 入数が空/0だと枚数に換算されない（枝は枠数なので対象外）
